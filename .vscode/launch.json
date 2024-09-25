@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=hydrogen",
+                    "--package=hydrogen"
+                ],
+                "filter": {
+                    "name": "hydrogen",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--config-file",
+                "${workspaceFolder}/dev/config.toml"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "HYDROGEN_LANGUAGE_PATH": "${workspaceFolder}/assets/langs",
+                "RUST_LOG": "hydrogen=debug"
+            }
+        }
+    ]
+}

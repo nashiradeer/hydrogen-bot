@@ -1,0 +1,11 @@
+/.git
+/.github
+/.vscode
+/target
+.env
+.gitignore
+CHANGELOG.md
+composer.yaml
+icon.png
+LICENSE.txt
+README.md
