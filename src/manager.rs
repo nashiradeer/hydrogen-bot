@@ -297,10 +297,14 @@ impl HydrogenManager {
         }
 
         let connection = player.connection.read().await;
+
         if let Some(channel_id) = connection.channel_id {
             let channel = self
                 .cache
-                .channel(channel_id.0)
+                .guild(guild_id)
+                .ok_or(HydrogenManagerError::GuildChannelNotFound)?
+                .channels
+                .get(&serenity::all::ChannelId::new(channel_id.0.into()))
                 .ok_or(HydrogenManagerError::GuildChannelNotFound)?
                 .clone();
 
