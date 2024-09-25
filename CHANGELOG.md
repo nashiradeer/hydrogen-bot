@@ -1,5 +1,18 @@
 # Hydrogen // Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Implement `Default` in `LavalinkUpdatePlayer`.
+- Implement `Display` instead of `ToString` in roll module.
+- Refactor manager module to remove deprecated `Cache::channel` function.
+
+### Removed
+
+- Remove `builtin-language` feature.
+- Remove `LavalinkUpdatePlayer::new()`.
+
 ## [0.0.1-alpha.9] - 2024-09-25
 
 ### Added
