@@ -36,7 +36,7 @@ impl LavalinkVoiceState {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LavalinkUpdatePlayer {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,18 +56,6 @@ pub struct LavalinkUpdatePlayer {
 }
 
 impl LavalinkUpdatePlayer {
-    pub fn new() -> Self {
-        Self {
-            encoded_track: None,
-            identifier: None,
-            end_time: None,
-            paused: None,
-            position: None,
-            voice: None,
-            volume: None,
-        }
-    }
-
     pub fn encoded_track(&mut self, encoded_track: &str) -> &mut Self {
         if self.identifier.is_none() {
             self.encoded_track = Some(Some(encoded_track.to_owned()));
