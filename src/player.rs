@@ -32,7 +32,6 @@ pub enum LoopType {
 #[derive(Clone)]
 pub struct HydrogenMusic {
     pub encoded_track: String,
-    pub length: i32,
     pub author: String,
     pub title: String,
     pub uri: Option<String>,
@@ -43,7 +42,6 @@ impl HydrogenMusic {
     pub fn from(value: LavalinkTrack, requester_id: UserId) -> Self {
         HydrogenMusic {
             encoded_track: value.encoded,
-            length: value.info.length,
             author: value.info.author,
             title: value.info.title,
             uri: value.info.uri,
@@ -175,7 +173,7 @@ impl HydrogenPlayer {
     }
 
     pub async fn set_pause(&self, paused: bool) -> Result<()> {
-        let mut player = LavalinkUpdatePlayer::new();
+        let mut player = LavalinkUpdatePlayer::default();
 
         player.paused(paused);
 
@@ -404,7 +402,7 @@ impl HydrogenPlayer {
     }
 
     pub async fn seek(&self, milliseconds: i32) -> Result<Option<HydrogenSeekCommand>> {
-        let mut update_player = LavalinkUpdatePlayer::new();
+        let mut update_player = LavalinkUpdatePlayer::default();
         update_player.position(milliseconds);
         let player = self
             .lavalink
@@ -431,7 +429,7 @@ impl HydrogenPlayer {
             .await
             .get(self.index.load(Ordering::Relaxed))
         {
-            let mut player = LavalinkUpdatePlayer::new();
+            let mut player = LavalinkUpdatePlayer::default();
             player
                 .encoded_track(&music.encoded_track)
                 .voice_state(connection.clone().into())
@@ -469,7 +467,7 @@ impl HydrogenPlayer {
 
     pub async fn update_connection(&self) -> Result<()> {
         let connection = self.connection.read().await;
-        let mut player = LavalinkUpdatePlayer::new();
+        let mut player = LavalinkUpdatePlayer::default();
         player.voice_state(connection.clone().into());
 
         self.lavalink

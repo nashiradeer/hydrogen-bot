@@ -8,12 +8,6 @@ readme = "README.md"
 keywords = ["discord", "lavalink", "music"]
 publish = false
 
-[features]
-default = ["builtin-language"]
-# Enable the builtin default language. (default)
-# Don't disable if you will build using the provided Dockerfile because the image willn't include the 'en-US' language file.
-builtin-language = []
-
 [dependencies]
 async-trait = "0.1.83"
 dashmap = "6.1.0"

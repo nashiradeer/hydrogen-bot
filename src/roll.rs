@@ -212,11 +212,11 @@ impl From<Dice> for i32 {
     }
 }
 
-impl ToString for Dice {
-    fn to_string(&self) -> String {
+impl Display for Dice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Fate(fate) => fate.to_string(),
-            Self::Sided(value) => value.to_string(),
+            Self::Fate(fate) => fate.fmt(f),
+            Self::Sided(value) => value.fmt(f),
         }
     }
 }
@@ -225,17 +225,12 @@ impl ToString for Dice {
 #[derive(Debug, Clone)]
 pub struct Roll(Vec<Vec<Dice>>, Modifier);
 
-impl ToString for Roll {
-    fn to_string(&self) -> String {
-        // Create a string to store the result.
+impl Display for Roll {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut result = String::new();
 
-        // Iterate over the repetitions.
         for roll in self.0.iter() {
-            // Calculate the total of the roll in the repetition.
             let total = roll.iter().cloned().map(i32::from).sum();
-
-            // Add the result to the string, including the total with the modifier applied.
             result.push_str(&format!(
                 "[{}]: {} = {}\n",
                 roll.iter()
@@ -247,7 +242,7 @@ impl ToString for Roll {
             ));
         }
 
-        result
+        write!(f, "{}", result)
     }
 }
 
@@ -276,12 +271,12 @@ impl FateDice {
     }
 }
 
-impl ToString for FateDice {
-    fn to_string(&self) -> String {
+impl Display for FateDice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Minus => "-".to_string(),
-            Self::Zero => "0".to_string(),
-            Self::Plus => "+".to_string(),
+            Self::Minus => write!(f, "-"),
+            Self::Zero => write!(f, "0"),
+            Self::Plus => write!(f, "+"),
         }
     }
 }
