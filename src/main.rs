@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use config::load_configuration;
 use dashmap::DashMap;
 use handler::{register_commands, AutoRemoverKey};
-use hydrogen_i18n::I18n;
+use hydrogen_i18n::{builders::I18nBuilder, I18n};
 use lavalink::LavalinkNodeInfo;
 use manager::HydrogenManager;
 use parsers::{RollParser, TimeParser};
@@ -33,7 +33,7 @@ mod commands;
 mod components;
 mod config;
 mod handler;
-mod lavalink;
+pub mod lavalink;
 mod manager;
 mod parsers;
 mod player;
@@ -65,7 +65,6 @@ pub static HYDROGEN_REPOSITORY_URL: &str = "https://github.com/nashiradeer/hydro
 /// Hydrogen's project name.
 pub static HYDROGEN_NAME: &str = "Hydrogen";
 
-#[cfg(feature = "builtin-language")]
 /// Default language file already loaded in the binary.
 pub static HYDROGEN_DEFAULT_LANGUAGE: &str = include_str!("../langs/en-US.json");
 
@@ -102,16 +101,6 @@ struct HydrogenHandler {
     other_roll_bots: Vec<u64>,
     /// If the bot should force enable auto-roll from messages.
     force_roll: bool,
-}
-
-#[async_trait]
-trait HydrogenComponentListener {
-    async fn execute(
-        &self,
-        hydrogen: HydrogenContext,
-        context: Context,
-        interaction: ComponentInteraction,
-    );
 }
 
 /// A key for the shard manager runners in the TypeMap.
@@ -305,24 +294,6 @@ impl EventHandler for HydrogenHandler {
     }
 }
 
-#[cfg(not(feature = "builtin-language"))]
-/// Create a new i18n instance.
-#[inline]
-fn new_i18n() -> I18n {
-    I18n::new()
-}
-
-#[cfg(feature = "builtin-language")]
-/// Create a new i18n instance with default language if can be parsed.
-#[inline]
-fn new_i18n() -> I18n {
-    if let Ok(default_language) = serde_json::from_str(HYDROGEN_DEFAULT_LANGUAGE) {
-        I18n::new_with_default(default_language)
-    } else {
-        I18n::new()
-    }
-}
-
 /// Executable entrypoint.
 #[tokio::main]
 async fn main() {
@@ -333,7 +304,7 @@ async fn main() {
         .init();
 
     // Initialize i18n with default language if can be parsed.
-    let mut i18n = new_i18n();
+    let mut i18n_builder = I18nBuilder::new(HYDROGEN_DEFAULT_LANGUAGE);
 
     // Load configuration from file or environment.
     let mut config = load_configuration().or_from_env();
@@ -344,37 +315,26 @@ async fn main() {
 
     // Load language files.
     if let Some(language_path) = config.language_path {
-        if let Err(e) =
-            i18n.from_dir_with_links(language_path, false, config.default_language.is_none())
-        {
-            warn!("cannot load language files: {}", e);
-        } else {
-            i18n.cleanup_links();
-        }
-    }
-
-    // Set a new default language if the environment variable is set.
-    if let Some(default_language) = config.default_language {
-        if !i18n.set_default(&default_language, true) {
-            error!("cannot set default language to '{}'", default_language);
-        }
-        // TODO: deduplicate loaded language when hydrogen_i18n supports it.
+        i18n_builder = match i18n_builder.add_from_dir(language_path) {
+            Ok(v) => v,
+            Err(e) => {
+                panic!("cannot load language files: {}", e);
+            }
+        };
     }
 
     // Initialize time parsers.
     let time_parsers = Arc::new(match TimeParser::new() {
         Ok(v) => v,
         Err(e) => {
-            error!("cannot initialize time parsers: {}", e);
-            exit(1)
+            panic!("cannot initialize time parsers: {}", e);
         }
     });
 
     let roll_parser = Arc::new(match RollParser::new() {
         Ok(v) => v,
         Err(e) => {
-            error!("cannot initialize roll parser: {}", e);
-            exit(1);
+            panic!("cannot initialize roll parser: {}", e);
         }
     });
 
@@ -397,7 +357,7 @@ async fn main() {
         context: HydrogenContext {
             manager: Arc::new(RwLock::new(None)),
             commands_id: Arc::new(RwLock::new(HashMap::new())),
-            i18n: Arc::new(i18n),
+            i18n: Arc::new(i18n_builder.build().unwrap()),
             components_responses: Arc::new(DashMap::new()),
             public_instance: config.public_instance.unwrap_or_default(),
             time_parsers,
@@ -409,7 +369,7 @@ async fn main() {
     };
 
     let mut client = Client::builder(
-        &config.discord_token.unwrap(),
+        config.discord_token.unwrap(),
         GatewayIntents::GUILDS
             | GatewayIntents::GUILD_VOICE_STATES
             | GatewayIntents::MESSAGE_CONTENT
