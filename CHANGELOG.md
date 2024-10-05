@@ -4,14 +4,25 @@
 
 ### Changed
 
+- Change how commands and components are registered and handled.
+- Change how Hydrogen loads the Lavalink configuration.
 - Implement `Default` in `LavalinkUpdatePlayer`.
 - Implement `Display` instead of `ToString` in roll module.
+- Move to a static context.
+- Move to static i18n translations.
 - Refactor manager module to remove deprecated `Cache::channel` function.
+- Refactor project structure.
 
 ### Removed
 
+- Remove Deutch (de) translation.
 - Remove `builtin-language` feature.
+- Remove config handler (also removes config from files and command line).
+- Remove Latin American Spanish (es-419) translation.
 - Remove `LavalinkUpdatePlayer::new()`.
+- Remove multi Lavalink node support.
+- Remove public instance warning.
+- Remove Spanish (es-ES) translation.
 
 ## [0.0.1-alpha.9] - 2024-09-25
 
