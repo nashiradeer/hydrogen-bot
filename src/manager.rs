@@ -86,7 +86,6 @@ pub struct HydrogenManager {
     cache: Arc<Cache>,
     destroy_handle: Arc<RwLock<HashMap<GuildId, JoinHandle<()>>>>,
     http: Arc<Http>,
-    i18n: Arc<I18n>,
     lavalink: Arc<RwLock<Vec<Lavalink>>>,
     load_balancer: Arc<AtomicUsize>,
     message: Arc<RwLock<HashMap<GuildId, MessageId>>>,
@@ -94,7 +93,7 @@ pub struct HydrogenManager {
 }
 
 impl HydrogenManager {
-    pub fn new(cache: Arc<Cache>, http: Arc<Http>, i18n: Arc<I18n>) -> Self {
+    pub fn new(cache: Arc<Cache>, http: Arc<Http>) -> Self {
         Self {
             lavalink: Arc::new(RwLock::new(Vec::new())),
             destroy_handle: Arc::new(RwLock::new(HashMap::new())),
@@ -103,7 +102,6 @@ impl HydrogenManager {
             player: Arc::new(RwLock::new(HashMap::new())),
             cache,
             http,
-            i18n,
         }
     }
 

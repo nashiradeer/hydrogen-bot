@@ -1,154 +1,119 @@
-//! Hydrogen // Commands // Join
-//!
 //! '/join' command registration and execution.
 
-use hydrogen_i18n::I18n;
 use serenity::{all::CommandInteraction, builder::CreateCommand, client::Context};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use crate::{
-    handler::{Response, Result},
-    utils::{error_message, MusicCommonData},
-    HydrogenContext, HYDROGEN_BUG_URL,
+    handler::{Response, ResponseType, ResponseValue},
+    i18n::{serenity_command_description, serenity_command_name, t_vars},
+    LOADED_COMMANDS, MANAGER,
 };
 
 /// Executes the `/join` command.
-pub async fn execute(
-    hydrogen: &HydrogenContext,
-    context: &Context,
-    interaction: &CommandInteraction,
-) -> Result {
-    // Get the translation for the command's title.
-    let title = hydrogen
-        .i18n
-        .translate(&interaction.locale, "join", "embed_title");
-
-    // Get the common data used by music commands and components.
-    let Some(data) = MusicCommonData::new(hydrogen, context, interaction.guild_id).await else {
-        error!("cannot get common music data");
-
-        return Err(Response::Generic {
-            title,
-            description: hydrogen
-                .i18n
-                .translate(&interaction.locale, "error", "unknown")
-                .replace("{url}", HYDROGEN_BUG_URL),
-        });
+pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) -> Response<'a> {
+    let guild_id = match interaction.guild_id {
+        Some(v) => v,
+        None => {
+            info!(
+                "(commands::join): the user {} is not in a guild",
+                interaction.user.id
+            );
+            return Response::new("join.name", "error.not_in_guild", ResponseType::Error);
+        }
     };
 
-    // Check if a player already exists.
-    if data.manager.contains_player(data.guild_id).await {
-        warn!("a player already exists in the guild {}", data.guild_id);
+    let manager = match MANAGER.get() {
+        Some(v) => v,
+        None => {
+            error!("(commands::join): the manager is not initialized");
+            return Response::new("join.name", "error.unknown", ResponseType::Error);
+        }
+    };
 
-        return Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "player_exists")
-                    .replace("{url}", HYDROGEN_BUG_URL),
-            ),
-        });
+    if manager.contains_player(guild_id).await {
+        info!(
+            "(commands::join): a player already exists in the guild {}",
+            guild_id
+        );
+        return Response::new("join.name", "error.player_exists", ResponseType::Error);
     }
 
-    // Get the user's voice channel ID.
-    let Some(voice_channel_id) = data.get_connected_channel(interaction.user.id) else {
-        warn!(
-            "cannot get the voice channel ID of the user {} in the guild {}",
-            interaction.user.id, data.guild_id
+    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
+        guild
+            .voice_states
+            .get(&interaction.user.id)
+            .and_then(|voice_state| voice_state.channel_id)
+    }) else {
+        info!(
+            "(commands::join): the user {} is not in a voice chat in the guild {}",
+            interaction.user.id, guild_id
         );
-
-        return Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "unknown_voice_state")
-                    .replace("{url}", HYDROGEN_BUG_URL),
-            ),
-        });
+        return Response::new(
+            "join.name",
+            "error.unknown_voice_state",
+            ResponseType::Error,
+        );
     };
 
-    // Join the voice channel.
-    if let Err(e) = data
-        .voice_manager
-        .join_gateway(data.guild_id, voice_channel_id)
-        .await
-    {
-        warn!(
-            "cannot connect to the voice channel in the guild {}: {}",
-            data.guild_id, e
-        );
+    let voice_manager = match songbird::get(context).await {
+        Some(v) => v,
+        None => {
+            error!("(commands::join): cannot get the voice manager");
+            return Response::new("join.name", "error.unknown", ResponseType::Error);
+        }
+    };
 
-        return Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "cant_connect"),
-            ),
-        });
+    if let Err(e) = voice_manager.join_gateway(guild_id, voice_channel_id).await {
+        warn!(
+            "(commands::join): cannot connect to the voice channel in the guild {}: {}",
+            guild_id, e
+        );
+        return Response::new("join.name", "error.cant_connect", ResponseType::Error);
     }
 
     // Initialize the player.
-    if let Err(e) = data
-        .manager
+    if let Err(e) = manager
         .init(
-            data.guild_id,
+            guild_id,
             &interaction
                 .guild_locale
                 .clone()
                 .unwrap_or(interaction.locale.clone()),
-            data.voice_manager.clone(),
+            voice_manager.clone(),
             interaction.channel_id,
         )
         .await
     {
         error!(
-            "cannot initialize the player in the guild {}: {}",
-            data.guild_id, e
+            "(commands::join): cannot initialize the player in the guild {}: {}",
+            guild_id, e
         );
-
-        return Err(Response::Generic {
-            title,
-            description: hydrogen
-                .i18n
-                .translate(&interaction.locale, "error", "unknown")
-                .replace("{url}", HYDROGEN_BUG_URL),
-        });
+        return Response::new("join.name", "error.unknown", ResponseType::Error);
     }
 
-    // Get play command's mention.
-    let play_command = match hydrogen.commands_id.read().await.get("play") {
+    let play_command: &'a str = match LOADED_COMMANDS.get().and_then(|v| v.get("play")) {
         Some(v) => format!("</play:{}>", v.get()),
         None => "`/play`".to_owned(),
-    };
+    }
+    .leak();
 
-    Ok(Response::Generic {
-        title,
-        description: hydrogen
-            .i18n
-            .translate(&interaction.locale, "join", "joined")
-            .replace("{play}", &play_command),
-    })
+    Response::raw(
+        ResponseValue::TranslationKey("join.name"),
+        ResponseValue::Raw(t_vars(
+            &interaction.locale,
+            "join.joined",
+            [("play", play_command)],
+        )),
+        ResponseType::Success,
+    )
 }
 
-/// Registers the `/join` command.
-///
-/// If `i18n` is `None`, the translation will be ignored.
-pub fn register(i18n: Option<&I18n>) -> CreateCommand {
+/// Creates the `/join` [CreateCommand].
+pub fn create_command() -> CreateCommand {
     let mut command = CreateCommand::new("join");
 
-    if let Some(i18n) = i18n {
-        command = i18n.serenity_command_name("join", "name", command);
-        command = i18n.serenity_command_description("join", "description", command);
-    }
+    command = serenity_command_name("join.name", command);
+    command = serenity_command_description("join.description", command);
 
     command
         .description("Make me join your voice chat without playing anything.")
