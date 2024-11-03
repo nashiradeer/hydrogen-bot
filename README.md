@@ -12,20 +12,10 @@ To build Hydrogen, you need to have [Docker](https://docker.com) (Podman not sup
 
 You can configure Hydrogen using environment variables, here is a list of the available variables:
 
-- HYDROGEN_DISCORD_TOKEN: Sets the token that will be used to access Discord. (required)
-- HYDROGEN_LAVALINK: Set the list of Lavalink nodes that can be used, read more below. (required)
-- HYDROGEN_DEFAULT_LANGUAGE: Sets a new default language to Hydrogen. (optional)
-- HYDROGEN_LANGUAGE_PATH: Sets the path where the Hydrogen translation files can be found. (optional)
-- HYDROGEN_FORCE_ROLL: Force enables the auto-roll from messages. (optional)
-
-### HYDROGEN_LAVALINK syntax
-
-```plain
-value           = single-node *(";" single-node)
-single-node     = host "," password ["," tls]
-host            = ip ":" port
-tls             = "true" / "enabled" / "on"
-```
+- DISCORD_TOKEN: Sets the token that will be used to access Discord. (required)
+- LAVALINK_HOST: Sets the Lavalink host. (required, e.g. "localhost:2333")
+- LAVALINK_PASSWORD: Sets the Lavalink password. (required)
+- LAVALINK_TLS: Sets if the Lavalink connection should use TLS. (optional, default: false)
 
 ## Credits
 

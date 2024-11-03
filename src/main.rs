@@ -1,114 +1,85 @@
-use std::{collections::HashMap, env, process::exit, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    env,
+    sync::{LazyLock, OnceLock},
+    time::Instant,
+};
 
 use async_trait::async_trait;
-use config::load_configuration;
 use dashmap::DashMap;
-use handler::{register_commands, AutoRemoverKey};
-use hydrogen_i18n::{builders::I18nBuilder, I18n};
+use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
 use lavalink::LavalinkNodeInfo;
 use manager::HydrogenManager;
-use parsers::{RollParser, TimeParser};
 use serenity::{
     all::{
-        Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Message, Ready,
-        ShardId, UserId, VoiceServerUpdateEvent, VoiceState,
+        Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Ready,
+        VoiceServerUpdateEvent, VoiceState,
     },
     client::{Context, EventHandler},
-    gateway::ShardRunnerInfo,
-    prelude::TypeMapKey,
 };
 use songbird::SerenityInit;
-use tokio::{
-    sync::{Mutex, RwLock},
-    task::JoinHandle,
-};
-use tracing::{debug, error, info, warn};
+use tokio::task::JoinHandle;
+use tracing::{debug, info, warn};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
 };
 
-use crate::handler::{handle_command, handle_component};
-
 mod commands;
 mod components;
-mod config;
 mod handler;
+mod i18n;
 pub mod lavalink;
 mod manager;
-mod parsers;
 mod player;
-mod roll;
 mod utils;
 
-pub const HYDROGEN_PRIMARY_COLOR: i32 = 0x5865f2;
-pub const HYDROGEN_ERROR_COLOR: i32 = 0xf04747;
-pub const HYDROGEN_EMPTY_CHAT_TIMEOUT: u64 = 10;
-pub const HYDROGEN_QUEUE_LIMIT: usize = 1000;
-pub const HYDROGEN_SEARCH_PREFIX: &str = "ytsearch:";
-pub const HYDROGEN_WARNING_TIMEOUT: u64 = 10;
-pub const HYDROGEN_WARNING_PROBABILITY: f64 = 0.1;
-pub const HYDROGEN_COLOR: i32 = 0x009b60;
-pub const LAVALINK_CONNECTION_TIMEOUT: u64 = 5000;
-/// The public instance ID.
-pub const HYDROGEN_PUBLIC_INSTANCE_ID: u64 = 1128087591179268116;
+/// The commands IDs that are registered.
+pub static LOADED_COMMANDS: OnceLock<HashMap<String, CommandId>> = OnceLock::new();
 
-pub static HYDROGEN_LOGO_URL: &str =
-    "https://raw.githubusercontent.com/nashiradeer/hydrogen/main/assets/icons/hydrogen-circular.png";
-pub static HYDROGEN_BUG_URL: &str = "https://github.com/nashiradeer/hydrogen/issues";
+/// Hydrogen's Player Manager.
+pub static MANAGER: OnceLock<HydrogenManager> = OnceLock::new();
 
-/// Hydrogen version.
-pub static HYDROGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The messages from the components.
+pub static COMPONENTS_MESSAGES: LazyLock<
+    DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
+> = LazyLock::new(DashMap::new);
 
-/// Hydrogen repository URL.
-pub static HYDROGEN_REPOSITORY_URL: &str = "https://github.com/nashiradeer/hydrogen";
+/// Lavalink node.
+pub static LAVALINK_NODE: OnceLock<LavalinkNodeInfo> = OnceLock::new();
 
-/// Hydrogen's project name.
-pub static HYDROGEN_NAME: &str = "Hydrogen";
+#[tokio::main]
+/// Hydrogen's main function.
+async fn main() {
+    registry()
+        .with(layer())
+        .with(EnvFilter::from_default_env())
+        .init();
 
-/// Default language file already loaded in the binary.
-pub static HYDROGEN_DEFAULT_LANGUAGE: &str = include_str!("../langs/en-US.json");
+    LAVALINK_NODE
+        .set(LavalinkNodeInfo {
+            host: env::var("LAVALINK_HOST").expect("LAVALINK_HOST is not set or invalid unicode"),
+            password: env::var("LAVALINK_PASSWORD")
+                .expect("LAVALINK_PASSWORD is not set or invalid unicode"),
+            tls: env::var_os("LAVALINK_TLS").is_some(),
+        })
+        .expect("cannot set LAVALINK_NODE");
 
-/// The public instance and other roll bots IDs.
-pub static OTHER_ROLL_BOTS: [u64; 1] = [
-    // Rollem bot ID.
-    240732567744151553,
-];
+    let mut client = Client::builder(
+        env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN is not set or invalid unicode"),
+        GatewayIntents::GUILDS
+            | GatewayIntents::GUILD_VOICE_STATES
+            | GatewayIntents::MESSAGE_CONTENT
+            | GatewayIntents::GUILD_MESSAGES,
+    )
+    .event_handler(HydrogenHandler)
+    .register_songbird()
+    .await
+    .expect("cannot initialize client");
 
-#[derive(Clone)]
-struct HydrogenContext {
-    pub i18n: Arc<I18n>,
-    pub manager: Arc<RwLock<Option<HydrogenManager>>>,
-
-    /// Parsers used to parse different time syntaxes.
-    pub time_parsers: Arc<TimeParser>,
-
-    /// Parser used to parse rolls.
-    pub roll_parser: Arc<RollParser>,
-
-    pub commands_id: Arc<RwLock<HashMap<String, CommandId>>>,
-
-    /// The responses from the components.
-    pub components_responses: Arc<DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>>,
-    /// Whether this is the public instance.
-    pub public_instance: bool,
+    client.start().await.expect("cannot start client");
 }
 
-#[derive(Clone)]
-struct HydrogenHandler {
-    context: HydrogenContext,
-    lavalink_nodes: Arc<Vec<LavalinkNodeInfo>>,
-    /// Other roll bots IDs.
-    other_roll_bots: Vec<u64>,
-    /// If the bot should force enable auto-roll from messages.
-    force_roll: bool,
-}
-
-/// A key for the shard manager runners in the TypeMap.
-pub struct ShardManagerRunners;
-
-impl TypeMapKey for ShardManagerRunners {
-    type Value = Arc<Mutex<HashMap<ShardId, ShardRunnerInfo>>>;
-}
+pub struct HydrogenHandler;
 
 #[async_trait]
 impl EventHandler for HydrogenHandler {
@@ -116,46 +87,22 @@ impl EventHandler for HydrogenHandler {
         let timer = Instant::now();
         debug!("(ready): processing...");
 
-        let manager = HydrogenManager::new(
-            ctx.cache.clone(),
-            ctx.http.clone(),
-            self.context.i18n.clone(),
-        );
-        *self.context.manager.write().await = Some(manager.clone());
+        MANAGER
+            .set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()))
+            .expect("cannot set MANAGER");
+
         debug!("(ready): HydrogenManager initialized");
 
-        if !register_commands(
-            Some(&self.context.i18n),
-            &ctx.http,
-            &self.context.commands_id,
-        )
-        .await
-        {
-            warn!("(ready): cannot register commands, retrying without translations...");
-
-            if !register_commands(None, &ctx.http, &self.context.commands_id).await {
-                error!("(ready): cannot register commands");
-                exit(1);
-            }
+        if !register_commands(&ctx.http).await {
+            panic!("cannot register commands");
         }
 
-        for i in 0..self.lavalink_nodes.len() {
-            if let Some(node) = self.lavalink_nodes.get(i) {
-                if let Err(e) = manager.connect_lavalink(node.clone()).await {
-                    error!("(ready): cannot connect to the lavalink node {}: {}", i, e);
-                }
-            }
-        }
-
-        if manager.lavalink_node_count().await == 0 {
-            error!("(ready): no lavalink nodes connected.");
-            exit(1);
-        }
-
-        info!(
-            "(ready): connected to {} lavalink nodes",
-            manager.lavalink_node_count().await
-        );
+        MANAGER
+            .get()
+            .unwrap()
+            .connect_lavalink(LAVALINK_NODE.get().unwrap().clone())
+            .await
+            .unwrap();
 
         info!(
             "(ready): client connected to '{}' in {}ms",
@@ -170,7 +117,7 @@ impl EventHandler for HydrogenHandler {
 
         match interaction {
             Interaction::Command(command) => {
-                handle_command(&self.context, &ctx, &command).await;
+                handle_command(&ctx, &command).await;
 
                 info!(
                     "(interaction_create): command '{}' executed in {}ms",
@@ -179,7 +126,7 @@ impl EventHandler for HydrogenHandler {
                 );
             }
             Interaction::Component(component) => {
-                handle_component(&self.context, &ctx, &component).await;
+                handle_component(&ctx, &component).await;
 
                 info!(
                     "(interaction_create): component '{}' executed in {}ms",
@@ -195,8 +142,7 @@ impl EventHandler for HydrogenHandler {
         let timer = Instant::now();
         debug!("(voice_state_update): processing...");
 
-        let option_manager = self.context.manager.read().await.clone();
-        if let Some(manager) = option_manager {
+        if let Some(manager) = MANAGER.get() {
             match manager.update_voice_state(old, new).await {
                 Ok(updated) => {
                     if updated {
@@ -219,8 +165,7 @@ impl EventHandler for HydrogenHandler {
         let timer = Instant::now();
         debug!("(voice_server_update): processing...");
 
-        let option_manager = self.context.manager.read().await.clone();
-        if let Some(manager) = option_manager {
+        if let Some(manager) = MANAGER.get() {
             match manager.update_voice_server(voice_server).await {
                 Ok(updated) => {
                     if updated {
@@ -238,153 +183,4 @@ impl EventHandler for HydrogenHandler {
             }
         }
     }
-
-    async fn message(&self, ctx: Context, message: Message) {
-        // Start the execution timer.
-        let timer = Instant::now();
-        debug!("(message): processing...");
-
-        // Ignore messages from bots.
-        if message.author.bot {
-            debug!("(message): message from bot, ignored");
-            return;
-        }
-
-        // Ignore messages from other roll bots.
-        if !self.force_roll {
-            if let Some(guild_id) = message.guild_id {
-                let mut other_roll_bot = None;
-                for id in &self.other_roll_bots {
-                    if let Ok(member) = ctx.http.get_member(guild_id, UserId::new(*id)).await {
-                        other_roll_bot = Some(member);
-                        break;
-                    }
-                }
-
-                if let Some(member) = other_roll_bot {
-                    warn!(
-                        "(message): other roll bot detected, ignored: {} ({})",
-                        &member.user.name, &member.user.id
-                    );
-                    return;
-                }
-            }
-        }
-
-        // Send message to the roll parser.
-        if let Some(params) = self.context.roll_parser.evaluate(&message.content) {
-            match params.roll() {
-                Ok(result) => {
-                    if let Err(e) = message.reply_ping(ctx, result.to_string()).await {
-                        warn!("(message): cannot send roll result: {}", e);
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "(message): cannot roll for user {}: {}",
-                        message.author.id, e
-                    );
-                }
-            };
-
-            info!("(message): processed in {}ms", timer.elapsed().as_millis());
-        } else {
-            debug!("(message): ignored");
-        }
-    }
-}
-
-/// Executable entrypoint.
-#[tokio::main]
-async fn main() {
-    // Initialize logger.
-    registry()
-        .with(layer())
-        .with(EnvFilter::from_default_env())
-        .init();
-
-    // Initialize i18n with default language if can be parsed.
-    let mut i18n_builder = I18nBuilder::new(HYDROGEN_DEFAULT_LANGUAGE);
-
-    // Load configuration from file or environment.
-    let mut config = load_configuration().or_from_env();
-
-    if config.public_instance.unwrap_or_default() {
-        warn!("you are running this instance as a public instance");
-    }
-
-    // Load language files.
-    if let Some(language_path) = config.language_path {
-        i18n_builder = match i18n_builder.add_from_dir(language_path) {
-            Ok(v) => v,
-            Err(e) => {
-                panic!("cannot load language files: {}", e);
-            }
-        };
-    }
-
-    // Initialize time parsers.
-    let time_parsers = Arc::new(match TimeParser::new() {
-        Ok(v) => v,
-        Err(e) => {
-            panic!("cannot initialize time parsers: {}", e);
-        }
-    });
-
-    let roll_parser = Arc::new(match RollParser::new() {
-        Ok(v) => v,
-        Err(e) => {
-            panic!("cannot initialize roll parser: {}", e);
-        }
-    });
-
-    // Get lavalink nodes.
-    let lavalink_nodes = config
-        .lavalink
-        .take()
-        .unwrap()
-        .into_iter()
-        .map(LavalinkNodeInfo::from)
-        .collect();
-
-    let mut other_roll_bots = Vec::from(OTHER_ROLL_BOTS);
-    if !config.public_instance.unwrap_or_default() {
-        other_roll_bots.push(HYDROGEN_PUBLIC_INSTANCE_ID);
-    }
-
-    // Initialize HydrogenHandler.
-    let app = HydrogenHandler {
-        context: HydrogenContext {
-            manager: Arc::new(RwLock::new(None)),
-            commands_id: Arc::new(RwLock::new(HashMap::new())),
-            i18n: Arc::new(i18n_builder.build().unwrap()),
-            components_responses: Arc::new(DashMap::new()),
-            public_instance: config.public_instance.unwrap_or_default(),
-            time_parsers,
-            roll_parser,
-        },
-        lavalink_nodes: Arc::new(lavalink_nodes),
-        other_roll_bots,
-        force_roll: config.force_roll.unwrap_or_default(),
-    };
-
-    let mut client = Client::builder(
-        config.discord_token.unwrap(),
-        GatewayIntents::GUILDS
-            | GatewayIntents::GUILD_VOICE_STATES
-            | GatewayIntents::MESSAGE_CONTENT
-            | GatewayIntents::GUILD_MESSAGES,
-    )
-    .event_handler(app)
-    .register_songbird()
-    .await
-    .expect("cannot initialize client");
-
-    client
-        .data
-        .write()
-        .await
-        .insert::<ShardManagerRunners>(client.shard_manager.runners.clone());
-
-    client.start().await.expect("cannot start client");
 }

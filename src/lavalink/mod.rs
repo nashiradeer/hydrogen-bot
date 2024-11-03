@@ -1,17 +1,6 @@
 use std::{fmt::Display, result, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use async_tungstenite::{
-    stream::Stream,
-    tokio::{connect_async, TokioAdapter},
-    tungstenite::{
-        self,
-        handshake::client::generate_key,
-        http::{self, Request},
-        Message,
-    },
-    WebSocketStream,
-};
 use futures::{stream::SplitStream, SinkExt, StreamExt};
 use reqwest::{
     header::{HeaderMap, InvalidHeaderValue},
@@ -24,9 +13,14 @@ use tokio::{
     sync::{oneshot, RwLock},
     time::sleep,
 };
-use tokio_native_tls::TlsStream;
-
-use crate::LAVALINK_CONNECTION_TIMEOUT;
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        handshake::client::{generate_key, Request as WsRequest},
+        Message,
+    },
+    MaybeTlsStream, WebSocketStream,
+};
 
 use self::{
     rest::{LavalinkErrorResponse, LavalinkPlayer, LavalinkTrackLoading, LavalinkUpdatePlayer},
@@ -91,7 +85,7 @@ pub trait LavalinkHandler {
 #[derive(Debug)]
 pub enum LavalinkError {
     Http(http::Error),
-    WebSocket(tungstenite::Error),
+    WebSocket(tokio_tungstenite::tungstenite::Error),
     Reqwest(reqwest::Error),
     InvalidHeaderValue(InvalidHeaderValue),
     RestError(LavalinkErrorResponse),
@@ -108,28 +102,28 @@ impl Display for LavalinkError {
             Self::InvalidHeaderValue(e) => e.fmt(f),
             Self::InvalidResponse(e) => e.fmt(f),
             Self::RestError(e) => write!(f, "rest api error: {}", e.message),
-            Self::NotConnected => write!(f, "lavalink connection timeout"),
+            Self::NotConnected => write!(f, "lavalink node is not connected"),
         }
     }
 }
 
 pub type Result<T> = result::Result<T, LavalinkError>;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LavalinkConnection {
     Disconnected,
     Connecting,
     Connected,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LavalinkNodeInfo {
     pub host: String,
     pub password: String,
     pub tls: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Lavalink {
     http_client: Client,
     tls: bool,
@@ -144,6 +138,7 @@ impl Lavalink {
         node: LavalinkNodeInfo,
         user_id: u64,
         handler: H,
+        timeout: Duration,
     ) -> Result<Self> {
         let websocket_uri = format!(
             "{}://{}/v3/websocket",
@@ -169,7 +164,7 @@ impl Lavalink {
             .build()
             .map_err(LavalinkError::Reqwest)?;
 
-        let request = Request::builder()
+        let request = WsRequest::builder()
             .header("Host", websocket_uri.clone())
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
@@ -205,7 +200,7 @@ impl Lavalink {
         });
 
         select! {
-            _ = sleep(Duration::from_millis(LAVALINK_CONNECTION_TIMEOUT)) => {
+            _ = sleep(timeout) => {
                 _ = sink.close().await;
                 Err(LavalinkError::NotConnected)
             }
@@ -328,9 +323,7 @@ impl Lavalink {
     }
 }
 
-type LavalinkStream = SplitStream<
-    WebSocketStream<Stream<TokioAdapter<TcpStream>, TokioAdapter<TlsStream<TcpStream>>>>,
->;
+type LavalinkStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 async fn read_socket<H: LavalinkHandler + Sync + Send + 'static>(
     handler: H,

@@ -1,111 +1,78 @@
-//! Hydrogen // Components // Stop
-//!
 //! 'stop' component execution.
 
-use serenity::{all::ComponentInteraction, client::Context};
-use tracing::{error, warn};
+use serenity::all::{ComponentInteraction, Context};
+use tracing::{error, info};
 
 use crate::{
-    handler::{Response, Result},
-    utils::{error_message, MusicCommonData},
-    HydrogenContext, HYDROGEN_BUG_URL,
+    handler::{Response, ResponseType},
+    MANAGER,
 };
 
 /// Executes the `stop` command.
-pub async fn execute(
-    hydrogen: &HydrogenContext,
-    context: &Context,
-    interaction: &ComponentInteraction,
-) -> Result {
-    // Get the translation for the command's title.
-    let title = hydrogen
-        .i18n
-        .translate(&interaction.locale, "stop", "embed_title");
-
-    // Get the common data used by music commands and components.
-    let Some(data) = MusicCommonData::new(hydrogen, context, interaction.guild_id).await else {
-        error!("cannot get common music data");
-
-        return Err(Response::Generic {
-            title,
-            description: hydrogen
-                .i18n
-                .translate(&interaction.locale, "error", "unknown")
-                .replace("{url}", HYDROGEN_BUG_URL),
-        });
+pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Response<'a> {
+    let guild_id = match interaction.guild_id {
+        Some(v) => v,
+        None => {
+            info!(
+                "(components::stop): the user {} is not in a guild",
+                interaction.user.id
+            );
+            return Response::new(
+                "stop.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
+        }
     };
 
-    // Get the user's voice channel ID.
-    let Some(voice_channel_id) = data.get_connected_channel(interaction.user.id) else {
-        warn!(
-            "cannot get the voice channel ID of the user {} in the guild {}",
-            interaction.user.id, data.guild_id
+    let manager = match MANAGER.get() {
+        Some(v) => v,
+        None => {
+            error!("(components::stop): the manager is not initialized");
+            return Response::new("stop.embed_title", "error.unknown", ResponseType::Error);
+        }
+    };
+
+    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
+        guild
+            .voice_states
+            .get(&interaction.user.id)
+            .and_then(|voice_state| voice_state.channel_id)
+    }) else {
+        info!(
+            "(components::stop): the user {} is not in a voice chat in the guild {}",
+            interaction.user.id, guild_id
         );
-
-        return Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "unknown_voice_state"),
-            ),
-        });
+        return Response::new(
+            "stop.embed_title",
+            "error.unknown_voice_state",
+            ResponseType::Error,
+        );
     };
 
-    // Get the voice channel ID of the bot.
-    if let Some(my_channel_id) = data.manager.get_voice_channel_id(data.guild_id).await {
+    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id).await {
         if my_channel_id == voice_channel_id.into() {
-            // Destroy the player.
-            if let Err(e) = data.manager.destroy(data.guild_id).await {
+            if let Err(e) = manager.destroy(guild_id).await {
                 error!(
-                    "cannot destroy the player in the guild {}: {}",
-                    data.guild_id, e
+                    "(components::stop): cannot stop the player in the guild {}: {}",
+                    guild_id, e
                 );
-
-                return Err(Response::Generic {
-                    title,
-                    description: error_message(
-                        &hydrogen.i18n,
-                        &interaction.locale,
-                        &hydrogen
-                            .i18n
-                            .translate(&interaction.locale, "error", "unknown"),
-                    ),
-                });
+                return Response::new("stop.embed_title", "error.unknown", ResponseType::Error);
             }
 
-            Ok(Response::Generic {
-                title,
-                description: hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "stop", "stopped"),
-            })
+            Response::new("stop.embed_title", "stop.stopped", ResponseType::Success)
         } else {
-            // Not in the same voice channel as the bot.
-            Err(Response::Generic {
-                title,
-                description: error_message(
-                    &hydrogen.i18n,
-                    &interaction.locale,
-                    &hydrogen
-                        .i18n
-                        .translate(&interaction.locale, "error", "not_in_voice_chat"),
-                ),
-            })
+            Response::new(
+                "stop.embed_title",
+                "error.not_in_voice_channel",
+                ResponseType::Error,
+            )
         }
     } else {
-        // Player doesn't exist.
-        Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "player_not_exists"),
-            ),
-        })
+        Response::new(
+            "stop.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }

@@ -1,228 +1,186 @@
-//! Hydrogen // Commands // Seek
-//!
 //! '/seek' command registration and execution.
 
-use hydrogen_i18n::I18n;
-use serenity::{
-    all::{CommandInteraction, CommandOptionType},
-    builder::{CreateCommand, CreateCommandOption},
-    client::Context,
+use serenity::all::{
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
 };
-use tracing::{error, warn};
+use tracing::{error, info};
 
 use crate::{
-    handler::{Response, Result},
-    utils::{error_message, get_str_option, progress_bar, time_to_string, MusicCommonData},
-    HydrogenContext, HYDROGEN_BUG_URL,
+    handler::{Response, ResponseType, ResponseValue},
+    i18n::{
+        serenity_command_description, serenity_command_name, serenity_command_option_description,
+        serenity_command_option_name, t_vars,
+    },
+    utils::{
+        progress_bar,
+        time_parsers::{semicolon_syntax, suffix_syntax},
+        time_to_string,
+    },
+    MANAGER,
 };
 
 /// Executes the `/seek` command.
-pub async fn execute(
-    hydrogen: &HydrogenContext,
-    context: &Context,
-    interaction: &CommandInteraction,
-) -> Result {
-    // Get the title of the embed.
-    let title = hydrogen
-        .i18n
-        .translate(&interaction.locale, "seek", "embed_title");
-
-    // Get the time option value.
-    let Some(time) = get_str_option(interaction, 0) else {
-        error!("cannot get the 'time' option");
-
-        return Err(Response::Generic {
-            title,
-            description: hydrogen
-                .i18n
-                .translate(&interaction.locale, "error", "unknown")
-                .replace("{url}", HYDROGEN_BUG_URL),
-        });
+pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) -> Response<'a> {
+    let guild_id = match interaction.guild_id {
+        Some(v) => v,
+        None => {
+            info!(
+                "(commands::seek): the user {} is not in a guild",
+                interaction.user.id
+            );
+            return Response::new(
+                "seek.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
+        }
     };
 
-    // Get the common data used by music commands and components.
-    let Some(data) = MusicCommonData::new(hydrogen, context, interaction.guild_id).await else {
-        error!("cannot get common music data");
-
-        return Err(Response::Generic {
-            title,
-            description: hydrogen
-                .i18n
-                .translate(&interaction.locale, "error", "unknown")
-                .replace("{url}", HYDROGEN_BUG_URL),
-        });
+    let manager = match MANAGER.get() {
+        Some(v) => v,
+        None => {
+            error!("(commands::seek): the manager is not initialized");
+            return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
+        }
     };
 
-    // Get the user's voice channel ID.
-    let Some(voice_channel_id) = data.get_connected_channel(interaction.user.id) else {
-        warn!(
-            "cannot get the voice channel ID of the user {} in the guild {}",
-            interaction.user.id, data.guild_id
+    let Some(time) = interaction
+        .data
+        .options
+        .first()
+        .and_then(|v| v.value.as_str())
+    else {
+        error!("(commands::seek): cannot get the 'time' option");
+        return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
+    };
+
+    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
+        guild
+            .voice_states
+            .get(&interaction.user.id)
+            .and_then(|voice_state| voice_state.channel_id)
+    }) else {
+        info!(
+            "(commands::seek): the user {} is not in a voice chat in the guild {}",
+            interaction.user.id, guild_id
         );
-
-        return Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "unknown_voice_state")
-                    .replace("{url}", HYDROGEN_BUG_URL),
-            ),
-        });
+        return Response::new(
+            "seek.embed_title",
+            "error.unknown_voice_state",
+            ResponseType::Error,
+        );
     };
 
-    // Get the player's voice channel ID.
-    if let Some(my_channel_id) = data.manager.get_voice_channel_id(data.guild_id).await {
-        // Checks if the user is in the same voice channel as the bot.
+    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id).await {
         if my_channel_id == voice_channel_id.into() {
-            // Try to parse the suffix syntax.
-            let seek_time = match hydrogen.time_parsers.suffix_syntax(time) {
+            let seek_time = match suffix_syntax(time) {
                 Some(v) => v,
-                // Try to parse the semicolon syntax.
-                None => match hydrogen.time_parsers.semicolon_syntax(time) {
+                None => match semicolon_syntax(time) {
                     Some(v) => v,
                     None => {
-                        warn!("cannot parse the time syntax: {}", time);
-
-                        return Err(Response::Generic {
-                            title,
-                            description: error_message(
-                                &hydrogen.i18n,
-                                &interaction.locale,
-                                &hydrogen.i18n.translate(
-                                    &interaction.locale,
-                                    "seek",
-                                    "invalid_syntax",
-                                ),
-                            ),
-                        });
+                        info!(
+                            "(commands::seek): the user {} provided an invalid syntax: {}",
+                            interaction.user.id, time
+                        );
+                        return Response::new(
+                            "seek.embed_title",
+                            "error.invalid_syntax",
+                            ResponseType::Error,
+                        );
                     }
                 },
             };
 
-            // Convert the seek time to a i32 for the player.
-            // TODO: Remove this when the player supports u32.
             let converted_seek_time = match seek_time.try_into() {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("cannot convert the seek time to a i32: {}", e);
-
-                    return Err(Response::Generic {
-                        title,
-                        description: hydrogen
-                            .i18n
-                            .translate(&interaction.locale, "error", "unknown")
-                            .replace("{url}", HYDROGEN_BUG_URL),
-                    });
+                    error!(
+                        "(commands::seek): cannot convert the seek time to a i32: {}",
+                        e
+                    );
+                    return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
 
-            // Seek the player.
-            let seek_result = match data.manager.seek(data.guild_id, converted_seek_time).await {
+            let seek_result = match manager.seek(guild_id, converted_seek_time).await {
                 Ok(Some(v)) => v,
                 Ok(None) => {
-                    // The queue is empty.
-                    warn!("guild {} has a empty queue", data.guild_id);
-
-                    return Err(Response::Generic {
-                        title,
-                        description: error_message(
-                            &hydrogen.i18n,
-                            &interaction.locale,
-                            &hydrogen
-                                .i18n
-                                .translate(&interaction.locale, "error", "empty_queue"),
-                        ),
-                    });
+                    info!(
+                        "(commands::seek): the player is empty in the guild {}",
+                        guild_id
+                    );
+                    return Response::new(
+                        "seek.embed_title",
+                        "error.empty_queue",
+                        ResponseType::Error,
+                    );
                 }
                 Err(e) => {
-                    // An error occurred.
                     error!(
-                        "cannot seek time the player in the guild {}: {}",
-                        data.guild_id, e
+                        "(commands::seek): cannot seek the player in the guild {}: {}",
+                        guild_id, e
                     );
-
-                    return Err(Response::Generic {
-                        title,
-                        description: hydrogen
-                            .i18n
-                            .translate(&interaction.locale, "error", "unknown")
-                            .replace("{url}", HYDROGEN_BUG_URL),
-                    });
+                    return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
 
-            // Get the current time, total time and progress bar.
             let current_time = time_to_string(seek_result.position / 1000);
             let total_time = time_to_string(seek_result.total / 1000);
             let progress_bar = progress_bar(seek_result.position, seek_result.total);
 
-            // Get the translation message.
             let translation_message = if let Some(uri) = seek_result.track.uri {
-                hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "seek", "seeking_url")
-                    .replace("{name}", &seek_result.track.title)
-                    .replace("{author}", &seek_result.track.author)
-                    .replace("{url}", &uri)
-                    .replace("{current}", &current_time)
-                    .replace("{total}", &total_time)
-                    .replace("{progress}", &progress_bar)
-            } else {
-                hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "seek", "seeking")
-                    .replace("{name}", &seek_result.track.title)
-                    .replace("{author}", &seek_result.track.author)
-                    .replace("{current}", &current_time)
-                    .replace("{total}", &total_time)
-                    .replace("{progress}", &progress_bar)
-            };
-
-            Ok(Response::Generic {
-                title,
-                description: translation_message,
-            })
-        } else {
-            // The user is not in the same voice channel as the bot.
-            Err(Response::Generic {
-                title,
-                description: error_message(
-                    &hydrogen.i18n,
+                t_vars(
                     &interaction.locale,
-                    &hydrogen
-                        .i18n
-                        .translate(&interaction.locale, "error", "not_in_voice_chat"),
-                ),
-            })
+                    "seek.seeking_url",
+                    [
+                        ("name", seek_result.track.title),
+                        ("author", seek_result.track.author),
+                        ("url", uri),
+                        ("current", current_time),
+                        ("total", total_time),
+                        ("progress", progress_bar),
+                    ],
+                )
+            } else {
+                t_vars(
+                    &interaction.locale,
+                    "seek.seeking",
+                    [
+                        ("name", seek_result.track.title),
+                        ("author", seek_result.track.author),
+                        ("current", current_time),
+                        ("total", total_time),
+                        ("progress", progress_bar),
+                    ],
+                )
+            };
+            Response::raw(
+                ResponseValue::TranslationKey("seek.embed_title"),
+                ResponseValue::RawString(translation_message),
+                ResponseType::Success,
+            )
+        } else {
+            Response::new(
+                "seek.embed_title",
+                "error.not_in_voice_chat",
+                ResponseType::Error,
+            )
         }
     } else {
-        // The player doesn't exists.
-        Err(Response::Generic {
-            title,
-            description: error_message(
-                &hydrogen.i18n,
-                &interaction.locale,
-                &hydrogen
-                    .i18n
-                    .translate(&interaction.locale, "error", "player_not_exists"),
-            ),
-        })
+        Response::new(
+            "seek.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }
 
-/// Registers the `/seek` command.
-///
-/// If `i18n` is `None`, the translation will be ignored.
-pub fn register(i18n: Option<&I18n>) -> CreateCommand {
+/// Creates the `/seek` [CreateCommand].
+pub fn create_command() -> CreateCommand {
     let mut command = CreateCommand::new("seek");
 
-    if let Some(i18n) = i18n {
-        command = i18n.serenity_command_name("seek", "name", command);
-        command = i18n.serenity_command_description("seek", "description", command);
-    }
+    command = serenity_command_name("seek.name", command);
+    command = serenity_command_description("seek.description", command);
 
     command
         .description("Seek for the time in the current music playing.")
@@ -234,11 +192,8 @@ pub fn register(i18n: Option<&I18n>) -> CreateCommand {
             )
             .required(true);
 
-            if let Some(i18n) = i18n {
-                option = i18n.serenity_command_option_name("seek", "time_name", option);
-                option =
-                    i18n.serenity_command_option_description("seek", "time_description", option);
-            }
+            option = serenity_command_option_name("seek.time_name", option);
+            option = serenity_command_option_description("seek.time_description", option);
 
             option
         })
