@@ -14,8 +14,8 @@ dashmap = "6.1.0"
 futures = "0.3.31"
 http = "1.1.0"
 rand = "0.8.5"
-regex = "1.11.0"
-serde_json = "1.0.128"
+regex = "1.11.1"
+serde_json = "1.0.132"
 tracing = "0.1.37"
 
 [dependencies.phf]
@@ -27,13 +27,13 @@ version = "0.24.0"
 features = ["rustls-tls-webpki-roots"]
 
 [dependencies.reqwest]
-version = "0.12.8"
+version = "0.12.9"
 default-features = false
 features = ["rustls-tls-webpki-roots", "json"]
 
 [dependencies.serde]
 package = "serde"
-version = "1.0.210"
+version = "1.0.214"
 features = ["derive"]
 
 [dependencies.serenity]
@@ -61,7 +61,7 @@ features = ["gateway", "serenity", "rustls"]
 
 [dependencies.tokio]
 package = "tokio"
-version = "1.40.0"
+version = "1.41.0"
 features = ["macros", "rt-multi-thread"]
 
 [dependencies.tracing-subscriber]
