@@ -7,14 +7,14 @@ mod en_us;
 mod pt_br;
 
 pub static AVAILABLE_LANGS: &[(&str, &Map<&str, &str>); 2] = &[
-    ("en_US", &en_us::TRANSLATIONS),
-    ("pt_BR", &pt_br::TRANSLATIONS),
+    ("en-US", &en_us::TRANSLATIONS),
+    ("pt-BR", &pt_br::TRANSLATIONS),
 ];
 
 /// Translate a key to a specific language.
 pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
     let lang_content = match lang {
-        "pt_BR" => &pt_br::TRANSLATIONS,
+        "pt-BR" => &pt_br::TRANSLATIONS,
         _ => &en_us::TRANSLATIONS,
     };
 
