@@ -71,7 +71,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
             Response::raw(
                 ResponseValue::TranslationKey("skip.name"),
-                ResponseValue::Raw(get_message(music, interaction)),
+                ResponseValue::RawString(get_message(music, interaction)),
                 ResponseType::Success,
             )
         } else {
@@ -87,18 +87,14 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 }
 
 /// Get the message to send to the user.
-fn get_message<'a>(track: HydrogenMusic, interaction: &ComponentInteraction) -> &'a str {
-    let track_title: &'a str = track.title.leak();
-    let track_author: &'a str = track.author.leak();
-
+fn get_message(track: HydrogenMusic, interaction: &ComponentInteraction) -> String {
     if let Some(uri) = track.uri {
-        let uri: &'a str = uri.leak();
         t_vars(
             &interaction.locale,
             "prev.returning_url",
             [
-                ("name", track_title),
-                ("author", track_author),
+                ("name", track.title),
+                ("author", track.author),
                 ("url", uri),
             ],
         )
@@ -106,7 +102,7 @@ fn get_message<'a>(track: HydrogenMusic, interaction: &ComponentInteraction) -> 
         t_vars(
             &interaction.locale,
             "prev.returning",
-            [("name", track_title), ("author", track_author)],
+            [("name", track.title), ("author", track.author)],
         )
     }
 }

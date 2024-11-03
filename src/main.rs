@@ -42,7 +42,7 @@ pub static MANAGER: OnceLock<HydrogenManager> = OnceLock::new();
 /// The messages from the components.
 pub static COMPONENTS_MESSAGES: LazyLock<
     DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
-> = LazyLock::new(|| DashMap::new());
+> = LazyLock::new(DashMap::new);
 
 /// Lavalink node.
 pub static LAVALINK_NODE: OnceLock<LavalinkNodeInfo> = OnceLock::new();
@@ -55,12 +55,14 @@ async fn main() {
         .with(EnvFilter::from_default_env())
         .init();
 
-    LAVALINK_NODE.set(LavalinkNodeInfo {
-        host: env::var("LAVALINK_HOST").expect("LAVALINK_HOST is not set or invalid unicode"),
-        password: env::var("LAVALINK_PASSWORD")
-            .expect("LAVALINK_PASSWORD is not set or invalid unicode"),
-        tls: env::var_os("LAVALINK_TLS").is_some(),
-    });
+    LAVALINK_NODE
+        .set(LavalinkNodeInfo {
+            host: env::var("LAVALINK_HOST").expect("LAVALINK_HOST is not set or invalid unicode"),
+            password: env::var("LAVALINK_PASSWORD")
+                .expect("LAVALINK_PASSWORD is not set or invalid unicode"),
+            tls: env::var_os("LAVALINK_TLS").is_some(),
+        })
+        .expect("cannot set LAVALINK_NODE");
 
     let mut client = Client::builder(
         env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN is not set or invalid unicode"),
@@ -85,7 +87,9 @@ impl EventHandler for HydrogenHandler {
         let timer = Instant::now();
         debug!("(ready): processing...");
 
-        MANAGER.set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()));
+        MANAGER
+            .set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()))
+            .expect("cannot set MANAGER");
 
         debug!("(ready): HydrogenManager initialized");
 

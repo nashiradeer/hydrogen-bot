@@ -59,11 +59,13 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 return Response::new("pause.name", "error.unknown", ResponseType::Error);
             }
 
-            let translation_key = if paused { "paused" } else { "resumed" };
+            let translation_key = if paused {
+                "pause.paused"
+            } else {
+                "pause.resumed"
+            };
 
-            let key_with_prefix: &'a str = format!("pause.{}", translation_key).leak();
-
-            Response::new("pause.name", key_with_prefix, ResponseType::Success)
+            Response::new("pause.name", translation_key, ResponseType::Success)
         } else {
             Response::new(
                 "pause.name",

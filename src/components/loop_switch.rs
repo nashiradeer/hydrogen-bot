@@ -63,20 +63,18 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             manager.set_loop_type(guild_id, new_loop_type.clone()).await;
 
             let loop_type_translation_key = match new_loop_type {
-                LoopType::None => "autostart",
-                LoopType::NoAutostart => "no_autostart",
-                LoopType::Music => "music",
-                LoopType::Queue => "queue",
-                LoopType::Random => "random",
+                LoopType::None => "loop.autostart",
+                LoopType::NoAutostart => "loop.no_autostart",
+                LoopType::Music => "loop.music",
+                LoopType::Queue => "loop.queue",
+                LoopType::Random => "loop.random",
             };
 
-            let translation_key: &'a str = format!("loop.{}", loop_type_translation_key).leak();
-
-            let loop_type_translation: &'a str = t(&interaction.locale, &translation_key);
+            let loop_type_translation = t(&interaction.locale, loop_type_translation_key);
 
             Response::raw(
                 ResponseValue::TranslationKey("loop.name"),
-                ResponseValue::Raw(t_vars(
+                ResponseValue::RawString(t_vars(
                     &interaction.locale,
                     "loop.looping",
                     [("loop", loop_type_translation)],

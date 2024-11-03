@@ -16,14 +16,16 @@ pub const HYDROGEN_QUEUE_LIMIT: usize = 1000;
 pub const HYDROGEN_SEARCH_PREFIX: &str = "ytsearch:";
 
 /// Connection timeout for the Lavalink node.
-pub const LAVALINK_CONNECTION_TIMEOUT: u64 = 5000;
+pub const LAVALINK_CONNECTION_TIMEOUT: u64 = 5_000;
 
 /// Hydrogen's logo URL, used in embed's footers.
 pub static HYDROGEN_LOGO_URL: &str =
     "https://raw.githubusercontent.com/nashiradeer/hydrogen/main/assets/icons/hydrogen-circular.png";
 
+#[allow(dead_code)]
 /// Hydrogen's version.
 pub static HYDROGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[allow(dead_code)]
 /// Hydrogen's project name.
 pub static HYDROGEN_NAME: &str = "Hydrogen";

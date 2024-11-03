@@ -8,6 +8,7 @@
 - Change how Hydrogen loads the Lavalink configuration.
 - Implement `Default` in `LavalinkUpdatePlayer`.
 - Implement `Display` instead of `ToString` in roll module.
+- Implement `Debug` to some structs in `lavalink` module.
 - Move to a static context.
 - Move to static i18n translations.
 - Refactor manager module to remove deprecated `Cache::channel` function.

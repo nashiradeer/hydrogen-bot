@@ -39,7 +39,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let Some(query) = interaction
         .data
         .options
-        .get(0)
+        .first()
         .and_then(|v| v.value.as_str())
     else {
         error!("(commands::play): cannot get the 'query' option");
@@ -142,15 +142,13 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     if result.count > 0 {
         Response::raw(
             ResponseValue::TranslationKey("play.name"),
-            ResponseValue::Raw(get_message(result, interaction)),
+            ResponseValue::RawString(get_message(result, interaction)),
             ResponseType::Success,
         )
+    } else if !result.truncated {
+        Response::new("play.name", "play.not_found", ResponseType::Error)
     } else {
-        if !result.truncated {
-            Response::new("play.name", "play.not_found", ResponseType::Error)
-        } else {
-            Response::new("play.name", "play.truncated", ResponseType::Error)
-        }
+        Response::new("play.name", "play.truncated", ResponseType::Error)
     }
 }
 
@@ -186,23 +184,16 @@ pub fn create_command() -> CreateCommand {
 }
 
 /// Get the message to send to the user.
-fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction) -> &'a str {
-    let track_count: &'a str = result.count.to_string().leak();
-
+fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) -> String {
     if let Some(track) = result.track {
-        let track_title: &'a str = track.title.leak();
-        let track_author: &'a str = track.author.leak();
-
         if result.playing && result.count == 1 {
             if let Some(uri) = track.uri {
-                let uri: &'a str = uri.leak();
-
                 return t_vars(
                     &interaction.locale,
                     "play.play_single_url",
                     [
-                        ("name", track_title),
-                        ("author", track_author),
+                        ("name", track.title),
+                        ("author", track.author),
                         ("url", uri),
                     ],
                 );
@@ -210,19 +201,17 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
                 return t_vars(
                     &interaction.locale,
                     "play.play_single",
-                    [("name", track_title), ("author", track_author)],
+                    [("name", track.title), ("author", track.author)],
                 );
             }
         } else if result.count == 1 {
             if let Some(uri) = track.uri {
-                let uri: &'a str = uri.leak();
-
                 return t_vars(
                     &interaction.locale,
                     "play.enqueue_single_url",
                     [
-                        ("name", track_title),
-                        ("author", track_author),
+                        ("name", track.title),
+                        ("author", track.author),
                         ("url", uri),
                     ],
                 );
@@ -230,22 +219,20 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
                 return t_vars(
                     &interaction.locale,
                     "play.enqueue_single",
-                    [("name", track_title), ("author", track_author)],
+                    [("name", track.title), ("author", track.author)],
                 );
             }
         } else if result.playing {
             if !result.truncated {
                 if let Some(uri) = track.uri {
-                    let uri: &'a str = uri.leak();
-
                     t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
                         [
-                            ("name", track_title),
-                            ("author", track_author),
+                            ("name", track.title),
+                            ("author", track.author),
                             ("url", uri),
-                            ("count", track_count),
+                            ("count", result.count.to_string()),
                         ],
                     );
                 } else {
@@ -253,15 +240,13 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
                         &interaction.locale,
                         "play.play_multi",
                         [
-                            ("name", track_title),
-                            ("author", track_author),
-                            ("count", track_count),
+                            ("name", track.title),
+                            ("author", track.author),
+                            ("count", result.count.to_string()),
                         ],
                     );
                 }
             } else if let Some(uri) = track.uri {
-                let uri: &'a str = uri.leak();
-
                 return format!(
                     "{}\n\n{}",
                     t(&interaction.locale, "play.truncated_warn"),
@@ -269,14 +254,13 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
                         &interaction.locale,
                         "play.play_multi_url",
                         [
-                            ("name", track_title),
-                            ("author", track_author),
+                            ("name", track.title),
+                            ("author", track.author),
                             ("url", uri),
-                            ("count", track_count),
+                            ("count", result.count.to_string()),
                         ]
                     ),
-                )
-                .leak();
+                );
             } else {
                 return format!(
                     "{}\n\n{}",
@@ -285,13 +269,12 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
                         &interaction.locale,
                         "play.play_multi",
                         [
-                            ("name", track_title),
-                            ("author", track_author),
-                            ("count", track_count),
+                            ("name", track.title),
+                            ("author", track.author),
+                            ("count", result.count.to_string()),
                         ]
                     ),
-                )
-                .leak();
+                );
             }
         }
     }
@@ -303,15 +286,14 @@ fn get_message<'a>(result: HydrogenPlayCommand, interaction: &CommandInteraction
             t_vars(
                 &interaction.locale,
                 "play.enqueue_multi",
-                [("count", track_count)]
+                [("count", result.count.to_string())]
             ),
-        )
-        .leak();
+        );
     }
 
     t_vars(
         &interaction.locale,
         "play.enqueue_multi",
-        [("count", track_count)],
+        [("count", result.count.to_string())],
     )
 }

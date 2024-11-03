@@ -6,11 +6,10 @@ use serenity::all::{CreateCommand, CreateCommandOption};
 mod en_us;
 mod pt_br;
 
-pub static AVAILABLE_LANGS: &'static [(&'static str, &'static Map<&'static str, &'static str>); 2] =
-    &[
-        ("en_US", &en_us::TRANSLATIONS),
-        ("pt_BR", &pt_br::TRANSLATIONS),
-    ];
+pub static AVAILABLE_LANGS: &[(&str, &Map<&str, &str>); 2] = &[
+    ("en_US", &en_us::TRANSLATIONS),
+    ("pt_BR", &pt_br::TRANSLATIONS),
+];
 
 /// Translate a key to a specific language.
 pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
@@ -26,22 +25,22 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
 }
 
 /// Translate a key to a specific language with variables.
-pub fn t_vars<'a, T: IntoIterator<Item = (&'a str, &'a str)>>(
+pub fn t_vars<'a, S: AsRef<str>, T: IntoIterator<Item = (&'a str, S)>>(
     lang: &str,
     key: &str,
     vars: T,
-) -> &'a str {
+) -> String {
     let mut content = t(lang, key).to_owned();
 
     for (k, v) in vars.into_iter() {
-        content = content.replace(&format!("{{{}}}", k), v);
+        content = content.replace(&format!("{{{}}}", k), v.as_ref());
     }
 
-    content.leak()
+    content
 }
 
 /// Translate a key to all available languages.
-pub fn t_all<'a>(key: &'a str) -> Iter<'a> {
+pub fn t_all(key: &str) -> Iter<'_> {
     Iter { key, index: 0 }
 }
 
@@ -69,7 +68,7 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 /// Inserts all the translations of a key into a [CreateCommand] as localized names.
-pub fn serenity_command_name<'a>(key: &str, mut command: CreateCommand) -> CreateCommand {
+pub fn serenity_command_name(key: &str, mut command: CreateCommand) -> CreateCommand {
     for (locale, name) in t_all(key) {
         command = command.name_localized(locale, name);
     }
@@ -78,7 +77,7 @@ pub fn serenity_command_name<'a>(key: &str, mut command: CreateCommand) -> Creat
 }
 
 /// Inserts all the translations of a key into a [CreateCommand] as localized descriptions.
-pub fn serenity_command_description<'a>(key: &str, mut command: CreateCommand) -> CreateCommand {
+pub fn serenity_command_description(key: &str, mut command: CreateCommand) -> CreateCommand {
     for (locale, description) in t_all(key) {
         command = command.description_localized(locale, description);
     }
@@ -87,7 +86,7 @@ pub fn serenity_command_description<'a>(key: &str, mut command: CreateCommand) -
 }
 
 /// Inserts all the translations of a key into a [CreateCommandOption] as localized names.
-pub fn serenity_command_option_name<'a>(
+pub fn serenity_command_option_name(
     key: &str,
     mut option: CreateCommandOption,
 ) -> CreateCommandOption {
@@ -99,7 +98,7 @@ pub fn serenity_command_option_name<'a>(
 }
 
 /// Inserts all the translations of a key into a [CreateCommandOption] as localized descriptions.
-pub fn serenity_command_option_description<'a>(
+pub fn serenity_command_option_description(
     key: &str,
     mut option: CreateCommandOption,
 ) -> CreateCommandOption {

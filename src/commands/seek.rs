@@ -6,7 +6,7 @@ use serenity::all::{
 use tracing::{error, info};
 
 use crate::{
-    handler::{Response, ResponseType},
+    handler::{Response, ResponseType, ResponseValue},
     i18n::{
         serenity_command_description, serenity_command_name, serenity_command_option_description,
         serenity_command_option_name, t_vars,
@@ -43,7 +43,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let Some(time) = interaction
         .data
         .options
-        .get(0)
+        .first()
         .and_then(|v| v.value.as_str())
     else {
         error!("(commands::seek): cannot get the 'time' option");
@@ -116,23 +116,17 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 }
             };
 
-            let current_time: &'a str = time_to_string(seek_result.position / 1000).leak();
-            let total_time: &'a str = time_to_string(seek_result.total / 1000).leak();
-            let progress_bar: &'a str =
-                progress_bar(seek_result.position, seek_result.total).leak();
+            let current_time = time_to_string(seek_result.position / 1000);
+            let total_time = time_to_string(seek_result.total / 1000);
+            let progress_bar = progress_bar(seek_result.position, seek_result.total);
 
-            let track_title: &'a str = seek_result.track.title.leak();
-            let track_author: &'a str = seek_result.track.author.leak();
-
-            let translation_message: &'a str = if let Some(uri) = seek_result.track.uri {
-                let uri: &'a str = uri.leak();
-
+            let translation_message = if let Some(uri) = seek_result.track.uri {
                 t_vars(
                     &interaction.locale,
                     "seek.seeking_url",
                     [
-                        ("name", track_title),
-                        ("author", track_author),
+                        ("name", seek_result.track.title),
+                        ("author", seek_result.track.author),
                         ("url", uri),
                         ("current", current_time),
                         ("total", total_time),
@@ -144,16 +138,19 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                     &interaction.locale,
                     "seek.seeking",
                     [
-                        ("name", track_title),
-                        ("author", track_author),
+                        ("name", seek_result.track.title),
+                        ("author", seek_result.track.author),
                         ("current", current_time),
                         ("total", total_time),
                         ("progress", progress_bar),
                     ],
                 )
             };
-
-            Response::new("seek.name", translation_message, ResponseType::Success)
+            Response::raw(
+                ResponseValue::TranslationKey("seek.name"),
+                ResponseValue::RawString(translation_message),
+                ResponseType::Success,
+            )
         } else {
             Response::new("seek.name", "error.not_in_voice_chat", ResponseType::Error)
         }

@@ -11,7 +11,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use hydrogen_i18n::I18n;
 use serenity::{
     all::{
         ButtonStyle, ChannelId, ChannelType, GuildId, MessageId, ReactionType, UserId,
@@ -29,6 +28,7 @@ use tokio::{spawn, sync::RwLock, task::JoinHandle, time::sleep};
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    i18n::{t, t_vars},
     lavalink::{
         websocket::{
             LavalinkTrackEndEvent, LavalinkTrackEndReason, LavalinkTrackExceptionEvent,
@@ -40,7 +40,10 @@ use crate::{
         HydrogenMusic, HydrogenPlayCommand, HydrogenPlayer, HydrogenPlayerError,
         HydrogenSeekCommand, LoopType,
     },
-    HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_LOGO_URL, HYDROGEN_PRIMARY_COLOR,
+    utils::constants::{
+        HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_LOGO_URL, HYDROGEN_PRIMARY_COLOR,
+        LAVALINK_CONNECTION_TIMEOUT,
+    },
 };
 
 #[derive(Debug)]
@@ -81,7 +84,7 @@ enum HydrogenPlayerState {
     Thinking,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HydrogenManager {
     cache: Arc<Cache>,
     destroy_handle: Arc<RwLock<HashMap<GuildId, JoinHandle<()>>>>,
@@ -108,9 +111,14 @@ impl HydrogenManager {
     pub async fn connect_lavalink(&self, node: LavalinkNodeInfo) -> Result<()> {
         let mut lavalink_vector = self.lavalink.write().await;
         let user_id = self.cache.current_user().id.get();
-        let lavalink = Lavalink::connect(node, user_id, self.clone())
-            .await
-            .map_err(HydrogenManagerError::Lavalink)?;
+        let lavalink = Lavalink::connect(
+            node,
+            user_id,
+            self.clone(),
+            Duration::from_millis(LAVALINK_CONNECTION_TIMEOUT),
+        )
+        .await
+        .map_err(HydrogenManagerError::Lavalink)?;
         lavalink_vector.push(lavalink);
         Ok(())
     }
@@ -318,10 +326,11 @@ impl HydrogenManager {
 
                     self.update_play_message(
                         guild_id,
-                        &self
-                            .i18n
-                            .translate(&player.guild_locale(), "player", "timeout")
-                            .replace("{time}", &HYDROGEN_EMPTY_CHAT_TIMEOUT.to_string()),
+                        &t_vars(
+                            &player.guild_locale(),
+                            "player.timeot",
+                            [("time", HYDROGEN_EMPTY_CHAT_TIMEOUT.to_string())],
+                        ),
                         HYDROGEN_PRIMARY_COLOR,
                         HydrogenPlayerState::Thinking,
                         player.pause(),
@@ -438,27 +447,23 @@ impl HydrogenManager {
             let mut player_state = HydrogenPlayerState::Playing;
 
             let (translated_message, requester) = match player.now().await {
-                Some(v) => {
-                    let message = match v.uri {
-                        Some(v) => self
-                            .i18n
-                            .translate(&player.guild_locale(), "player", "description_url")
-                            .replace("{url}", &v),
-                        None => {
-                            self.i18n
-                                .translate(&player.guild_locale(), "player", "description")
-                        }
-                    }
-                    .replace("{name}", &v.title)
-                    .replace("{author}", &v.author);
+                Some(t) => {
+                    let message = match t.uri {
+                        Some(v) => t_vars(
+                            &player.guild_locale(),
+                            "player.description_url",
+                            [("url", v), ("name", t.title), ("author", t.author)],
+                        ),
+                        None => t_vars(
+                            &player.guild_locale(),
+                            "player.description",
+                            [("name", t.title), ("author", t.author)],
+                        ),
+                    };
 
-                    (message, Some(v.requester_id))
+                    (message, Some(t.requester_id))
                 }
-                None => (
-                    self.i18n
-                        .translate(&player.guild_locale(), "player", "empty"),
-                    None,
-                ),
+                None => (t(&player.guild_locale(), "player.empty").to_owned(), None),
             };
 
             let mut author_obj = None;
@@ -522,18 +527,13 @@ impl HydrogenManager {
                         EditMessage::new()
                             .embed(
                                 embed
-                                    .title(self.i18n.translate(
-                                        &player.guild_locale(),
-                                        "player",
-                                        "title",
-                                    ))
+                                    .title(t(&player.guild_locale(), "player.title"))
                                     .description(description)
                                     .color(color)
                                     .footer(
-                                        CreateEmbedFooter::new(self.i18n.translate(
+                                        CreateEmbedFooter::new(t(
                                             &player.guild_locale(),
-                                            "generic",
-                                            "embed_footer",
+                                            "generic.embed_footer",
                                         ))
                                         .icon_url(HYDROGEN_LOGO_URL),
                                     ),
@@ -560,18 +560,13 @@ impl HydrogenManager {
                     CreateMessage::new()
                         .add_embed(
                             CreateEmbed::new()
-                                .title(self.i18n.translate(
-                                    &player.guild_locale(),
-                                    "player",
-                                    "title",
-                                ))
+                                .title(t(&player.guild_locale(), "player.title"))
                                 .description(description)
                                 .color(color)
                                 .footer(
-                                    CreateEmbedFooter::new(self.i18n.translate(
+                                    CreateEmbedFooter::new(t(
                                         &player.guild_locale(),
-                                        "generic",
-                                        "embed_footer",
+                                        "generic.embed_footer",
                                     ))
                                     .icon_url(HYDROGEN_LOGO_URL),
                                 ),

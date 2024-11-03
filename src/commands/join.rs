@@ -91,15 +91,14 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         return Response::new("join.name", "error.unknown", ResponseType::Error);
     }
 
-    let play_command: &'a str = match LOADED_COMMANDS.get().and_then(|v| v.get("play")) {
+    let play_command = match LOADED_COMMANDS.get().and_then(|v| v.get("play")) {
         Some(v) => format!("</play:{}>", v.get()),
         None => "`/play`".to_owned(),
-    }
-    .leak();
+    };
 
     Response::raw(
         ResponseValue::TranslationKey("join.name"),
-        ResponseValue::Raw(t_vars(
+        ResponseValue::RawString(t_vars(
             &interaction.locale,
             "join.joined",
             [("play", play_command)],

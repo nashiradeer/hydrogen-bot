@@ -101,7 +101,9 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
                 commands_id.insert(commands.name.clone(), commands.id);
             }
 
-            LOADED_COMMANDS.set(commands_id);
+            LOADED_COMMANDS
+                .set(commands_id)
+                .expect("cannot set the loaded commands");
 
             true
         }
@@ -172,16 +174,24 @@ impl<'a> Response<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// Represents a response value.
 pub enum ResponseValue<'a> {
+    /// Represents a translation key.
     TranslationKey(&'a str),
+
+    #[allow(dead_code)]
+    /// Represents a raw value.
     Raw(&'a str),
+
+    /// Represents a raw string.
+    RawString(String),
 }
 
 impl<'a> ResponseValue<'a> {
     /// Converts the [ResponseValue] into its value.
-    pub fn into_value(self, lang: &str) -> &'a str {
+    pub fn into_value(self, lang: &str) -> String {
         match self {
-            ResponseValue::TranslationKey(key) => t(lang, key),
-            ResponseValue::Raw(value) => value,
+            ResponseValue::TranslationKey(key) => t(lang, key).to_owned(),
+            ResponseValue::Raw(value) => value.to_owned(),
+            ResponseValue::RawString(value) => value,
         }
     }
 }

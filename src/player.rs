@@ -17,10 +17,10 @@ use crate::{
         rest::{LavalinkLoadResultType, LavalinkTrack, LavalinkUpdatePlayer, LavalinkVoiceState},
         Lavalink, LavalinkConnection, LavalinkError,
     },
-    HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIX,
+    utils::constants::{HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIX},
 };
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LoopType {
     None,
     NoAutostart,
@@ -29,7 +29,7 @@ pub enum LoopType {
     Random,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HydrogenMusic {
     pub encoded_track: String,
     pub author: String,
@@ -67,7 +67,7 @@ impl Display for HydrogenPlayerError {
 
 pub type Result<T> = result::Result<T, HydrogenPlayerError>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HydrogenPlayerConnection {
     pub session_id: String,
     pub token: String,
@@ -121,7 +121,7 @@ pub struct HydrogenSeekCommand {
     pub track: HydrogenMusic,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HydrogenPlayer {
     pub connection: Arc<RwLock<HydrogenPlayerConnection>>,
     destroyed: Arc<AtomicBool>,

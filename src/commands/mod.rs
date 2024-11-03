@@ -24,7 +24,7 @@ pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Opt
     })
 }
 
-pub fn all_create_commands<'a>() -> [CreateCommand; 3] {
+pub fn all_create_commands() -> [CreateCommand; 3] {
     [
         join::create_command(),
         seek::create_command(),
