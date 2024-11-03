@@ -19,7 +19,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "(components::loop): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("loop.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "loop.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -27,7 +31,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         Some(v) => v,
         None => {
             error!("(components::loop): the manager is not initialized");
-            return Response::new("loop.name", "error.unknown", ResponseType::Error);
+            return Response::new("loop.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -42,7 +46,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             interaction.user.id, guild_id
         );
         return Response::new(
-            "loop.name",
+            "loop.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -73,7 +77,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             let loop_type_translation = t(&interaction.locale, loop_type_translation_key);
 
             Response::raw(
-                ResponseValue::TranslationKey("loop.name"),
+                ResponseValue::TranslationKey("loop.embed_title"),
                 ResponseValue::RawString(t_vars(
                     &interaction.locale,
                     "loop.looping",
@@ -82,9 +86,17 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 ResponseType::Success,
             )
         } else {
-            Response::new("loop.name", "error.not_in_voice_chat", ResponseType::Error)
+            Response::new(
+                "loop.embed_title",
+                "error.not_in_voice_chat",
+                ResponseType::Error,
+            )
         }
     } else {
-        Response::new("loop.name", "error.player_not_exists", ResponseType::Error)
+        Response::new(
+            "loop.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }

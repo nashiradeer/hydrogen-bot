@@ -19,7 +19,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "(components::skip): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("skip.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "skip.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -27,7 +31,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         Some(v) => v,
         None => {
             error!("(components::skip): the manager is not initialized");
-            return Response::new("skip.name", "error.unknown", ResponseType::Error);
+            return Response::new("skip.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -42,7 +46,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             interaction.user.id, guild_id
         );
         return Response::new(
-            "skip.name",
+            "skip.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -57,7 +61,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                         "(components::skip): cannot go to the next track in the guild {}: {}",
                         guild_id, e
                     );
-                    return Response::new("skip.name", "error.unknown", ResponseType::Error);
+                    return Response::new("skip.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
 
@@ -66,23 +70,27 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                     "(components::skip): the queue is empty in the guild {}",
                     guild_id
                 );
-                return Response::new("skip.name", "error.empty_queue", ResponseType::Error);
+                return Response::new("skip.embed_title", "error.empty_queue", ResponseType::Error);
             };
 
             Response::raw(
-                ResponseValue::TranslationKey("skip.name"),
+                ResponseValue::TranslationKey("skip.embed_title"),
                 ResponseValue::RawString(get_message(music, interaction)),
                 ResponseType::Success,
             )
         } else {
             Response::new(
-                "skip.name",
+                "skip.embed_title",
                 "error.not_in_voice_channel",
                 ResponseType::Error,
             )
         }
     } else {
-        Response::new("skip.name", "error.player_not_exists", ResponseType::Error)
+        Response::new(
+            "skip.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }
 

@@ -18,7 +18,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 "(commands::join): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("join.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "join.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -26,7 +30,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some(v) => v,
         None => {
             error!("(commands::join): the manager is not initialized");
-            return Response::new("join.name", "error.unknown", ResponseType::Error);
+            return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -35,7 +39,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             "(commands::join): a player already exists in the guild {}",
             guild_id
         );
-        return Response::new("join.name", "error.player_exists", ResponseType::Error);
+        return Response::new(
+            "join.embed_title",
+            "error.player_exists",
+            ResponseType::Error,
+        );
     }
 
     let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
@@ -49,7 +57,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             interaction.user.id, guild_id
         );
         return Response::new(
-            "join.name",
+            "join.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -59,7 +67,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some(v) => v,
         None => {
             error!("(commands::join): cannot get the voice manager");
-            return Response::new("join.name", "error.unknown", ResponseType::Error);
+            return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -68,7 +76,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             "(commands::join): cannot connect to the voice channel in the guild {}: {}",
             guild_id, e
         );
-        return Response::new("join.name", "error.cant_connect", ResponseType::Error);
+        return Response::new(
+            "join.embed_title",
+            "error.cant_connect",
+            ResponseType::Error,
+        );
     }
 
     // Initialize the player.
@@ -88,7 +100,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             "(commands::join): cannot initialize the player in the guild {}: {}",
             guild_id, e
         );
-        return Response::new("join.name", "error.unknown", ResponseType::Error);
+        return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
     }
 
     let play_command = match LOADED_COMMANDS.get().and_then(|v| v.get("play")) {
@@ -97,7 +109,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     };
 
     Response::raw(
-        ResponseValue::TranslationKey("join.name"),
+        ResponseValue::TranslationKey("join.embed_title"),
         ResponseValue::RawString(t_vars(
             &interaction.locale,
             "join.joined",

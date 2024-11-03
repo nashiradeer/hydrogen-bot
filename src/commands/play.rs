@@ -24,7 +24,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 "(commands::play): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("play.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "play.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -32,7 +36,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some(v) => v,
         None => {
             error!("(commands::play): the manager is not initialized");
-            return Response::new("play.name", "error.unknown", ResponseType::Error);
+            return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -43,7 +47,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         .and_then(|v| v.value.as_str())
     else {
         error!("(commands::play): cannot get the 'query' option");
-        return Response::new("play.name", "error.unknown", ResponseType::Error);
+        return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
     };
 
     let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
@@ -57,7 +61,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             interaction.user.id, guild_id
         );
         return Response::new(
-            "play.name",
+            "play.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -67,7 +71,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some(v) => v,
         None => {
             error!("(commands::play): cannot get the voice manager");
-            return Response::new("play.name", "error.unknown", ResponseType::Error);
+            return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -85,7 +89,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                             guild_id, e
                         );
                         return Response::new(
-                            "play.name",
+                            "play.embed_title",
                             "error.cant_connect",
                             ResponseType::Error,
                         );
@@ -102,7 +106,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                     "(commands::play): cannot connect to the voice channel in the guild {}: {}",
                     guild_id, e
                 );
-                return Response::new("play.name", "error.cant_connect", ResponseType::Error);
+                return Response::new(
+                    "play.embed_title",
+                    "error.cant_connect",
+                    ResponseType::Error,
+                );
             }
         },
     };
@@ -110,7 +118,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     if let Some(connection_info) = call.lock().await.current_connection() {
         if let Some(channel_id) = connection_info.channel_id {
             if channel_id != voice_channel_id.into() {
-                return Response::new("play.name", "error.not_in_voice_chat", ResponseType::Error);
+                return Response::new(
+                    "play.embed_title",
+                    "error.not_in_voice_chat",
+                    ResponseType::Error,
+                );
             }
         }
     }
@@ -135,20 +147,20 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 "(commands::play): cannot play the music in the guild {}: {}",
                 guild_id, e
             );
-            return Response::new("play.name", "error.unknown", ResponseType::Error);
+            return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
     if result.count > 0 {
         Response::raw(
-            ResponseValue::TranslationKey("play.name"),
+            ResponseValue::TranslationKey("play.embed_title"),
             ResponseValue::RawString(get_message(result, interaction)),
             ResponseType::Success,
         )
     } else if !result.truncated {
-        Response::new("play.name", "play.not_found", ResponseType::Error)
+        Response::new("play.embed_title", "play.not_found", ResponseType::Error)
     } else {
-        Response::new("play.name", "play.truncated", ResponseType::Error)
+        Response::new("play.embed_title", "play.truncated", ResponseType::Error)
     }
 }
 

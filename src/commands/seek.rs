@@ -28,7 +28,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 "(commands::seek): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("seek.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "seek.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -36,7 +40,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some(v) => v,
         None => {
             error!("(commands::seek): the manager is not initialized");
-            return Response::new("seek.name", "error.unknown", ResponseType::Error);
+            return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -47,7 +51,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         .and_then(|v| v.value.as_str())
     else {
         error!("(commands::seek): cannot get the 'time' option");
-        return Response::new("seek.name", "error.unknown", ResponseType::Error);
+        return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
     };
 
     let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
@@ -61,7 +65,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             interaction.user.id, guild_id
         );
         return Response::new(
-            "seek.name",
+            "seek.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -79,7 +83,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                             interaction.user.id, time
                         );
                         return Response::new(
-                            "seek.name",
+                            "seek.embed_title",
                             "error.invalid_syntax",
                             ResponseType::Error,
                         );
@@ -94,7 +98,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                         "(commands::seek): cannot convert the seek time to a i32: {}",
                         e
                     );
-                    return Response::new("seek.name", "error.unknown", ResponseType::Error);
+                    return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
 
@@ -105,14 +109,18 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                         "(commands::seek): the player is empty in the guild {}",
                         guild_id
                     );
-                    return Response::new("seek.name", "error.empty_queue", ResponseType::Error);
+                    return Response::new(
+                        "seek.embed_title",
+                        "error.empty_queue",
+                        ResponseType::Error,
+                    );
                 }
                 Err(e) => {
                     error!(
                         "(commands::seek): cannot seek the player in the guild {}: {}",
                         guild_id, e
                     );
-                    return Response::new("seek.name", "error.unknown", ResponseType::Error);
+                    return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
 
@@ -147,15 +155,23 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 )
             };
             Response::raw(
-                ResponseValue::TranslationKey("seek.name"),
+                ResponseValue::TranslationKey("seek.embed_title"),
                 ResponseValue::RawString(translation_message),
                 ResponseType::Success,
             )
         } else {
-            Response::new("seek.name", "error.not_in_voice_chat", ResponseType::Error)
+            Response::new(
+                "seek.embed_title",
+                "error.not_in_voice_chat",
+                ResponseType::Error,
+            )
         }
     } else {
-        Response::new("seek.name", "error.player_not_exists", ResponseType::Error)
+        Response::new(
+            "seek.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }
 

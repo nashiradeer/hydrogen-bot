@@ -17,7 +17,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "(components::pause): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("pause.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "pause.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -25,7 +29,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         Some(v) => v,
         None => {
             error!("(components::pause): the manager is not initialized");
-            return Response::new("pause.name", "error.unknown", ResponseType::Error);
+            return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -40,7 +44,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             interaction.user.id, guild_id
         );
         return Response::new(
-            "pause.name",
+            "pause.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -56,7 +60,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                     "(components::pause): cannot resume/pause the player in the guild {}: {}",
                     guild_id, e
                 );
-                return Response::new("pause.name", "error.unknown", ResponseType::Error);
+                return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
             }
 
             let translation_key = if paused {
@@ -65,15 +69,19 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "pause.resumed"
             };
 
-            Response::new("pause.name", translation_key, ResponseType::Success)
+            Response::new("pause.embed_title", translation_key, ResponseType::Success)
         } else {
             Response::new(
-                "pause.name",
+                "pause.embed_title",
                 "error.not_in_voice_channel",
                 ResponseType::Error,
             )
         }
     } else {
-        Response::new("pause.name", "error.player_not_exists", ResponseType::Error)
+        Response::new(
+            "pause.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }

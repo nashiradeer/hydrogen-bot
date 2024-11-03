@@ -17,7 +17,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "(components::stop): the user {} is not in a guild",
                 interaction.user.id
             );
-            return Response::new("stop.name", "error.not_in_guild", ResponseType::Error);
+            return Response::new(
+                "stop.embed_title",
+                "error.not_in_guild",
+                ResponseType::Error,
+            );
         }
     };
 
@@ -25,7 +29,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         Some(v) => v,
         None => {
             error!("(components::stop): the manager is not initialized");
-            return Response::new("stop.name", "error.unknown", ResponseType::Error);
+            return Response::new("stop.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
@@ -40,7 +44,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             interaction.user.id, guild_id
         );
         return Response::new(
-            "stop.name",
+            "stop.embed_title",
             "error.unknown_voice_state",
             ResponseType::Error,
         );
@@ -53,18 +57,22 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                     "(components::stop): cannot stop the player in the guild {}: {}",
                     guild_id, e
                 );
-                return Response::new("stop.name", "error.unknown", ResponseType::Error);
+                return Response::new("stop.embed_title", "error.unknown", ResponseType::Error);
             }
 
-            Response::new("stop.name", "stop.stopped", ResponseType::Success)
+            Response::new("stop.embed_title", "stop.stopped", ResponseType::Success)
         } else {
             Response::new(
-                "stop.name",
+                "stop.embed_title",
                 "error.not_in_voice_channel",
                 ResponseType::Error,
             )
         }
     } else {
-        Response::new("stop.name", "error.player_not_exists", ResponseType::Error)
+        Response::new(
+            "stop.embed_title",
+            "error.player_not_exists",
+            ResponseType::Error,
+        )
     }
 }
