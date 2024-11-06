@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Player Manager is using the wrong translation key. ([#6](https://github.com/nashiradeer/hydrogen-bot/issues/6))
+
 ## [0.0.1-alpha.10] - 2024-11-03
 
 ### Changed
