@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     env,
+    process::exit,
     sync::{LazyLock, OnceLock},
     time::Instant,
 };
@@ -19,7 +20,7 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tokio::task::JoinHandle;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
 };
@@ -87,22 +88,39 @@ impl EventHandler for HydrogenHandler {
         let timer = Instant::now();
         debug!("(ready): processing...");
 
-        MANAGER
+        if MANAGER
             .set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()))
-            .expect("cannot set MANAGER");
+            .is_err()
+        {
+            error!("(ready): cannot set HydrogenManager in OnceLock");
+            exit(1);
+        }
 
         debug!("(ready): HydrogenManager initialized");
 
         if !register_commands(&ctx.http).await {
-            panic!("cannot register commands");
+            error!("(ready): cannot register commands");
+            exit(1);
         }
 
-        MANAGER
-            .get()
-            .unwrap()
-            .connect_lavalink(LAVALINK_NODE.get().unwrap().clone())
+        let Some(manager) = MANAGER.get() else {
+            error!("(ready): cannot get HydrogenManager from OnceLock");
+            exit(1);
+        };
+
+        let Some(lavalink_node) = LAVALINK_NODE.get() else {
+            error!("(ready): cannot get LavalinkNodeInfo from OnceLock");
+            exit(1);
+        };
+
+        if manager
+            .connect_lavalink(lavalink_node.clone())
             .await
-            .unwrap();
+            .is_err()
+        {
+            error!("(ready): cannot connect to Lavalink");
+            exit(1);
+        }
 
         info!(
             "(ready): client connected to '{}' in {}ms",
