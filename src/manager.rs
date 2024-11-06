@@ -328,7 +328,7 @@ impl HydrogenManager {
                         guild_id,
                         &t_vars(
                             &player.guild_locale(),
-                            "player.timeot",
+                            "player.timeout",
                             [("time", HYDROGEN_EMPTY_CHAT_TIMEOUT.to_string())],
                         ),
                         HYDROGEN_PRIMARY_COLOR,
