@@ -1,8 +1,12 @@
-use std::{borrow::Borrow, ops::Deref, sync::RwLock};
+use std::{
+    borrow::Borrow,
+    ops::{Deref, DerefMut},
+    sync::RwLock,
+};
 
 use futures::{
     stream::{SplitSink, SplitStream},
-    StreamExt,
+    SinkExt, StreamExt,
 };
 use tokio::{
     net::TcpStream,
@@ -17,7 +21,8 @@ pub type LavalinkConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 /// A stream of messages from a Lavalink server.
 pub type LavalinkStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 /// A sink for sending messages to a Lavalink server.
-pub type LavalinkSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+pub type LavalinkSink =
+    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
 
 #[derive(Clone, Debug)]
 /// A connection to a Lavalink server.
@@ -142,6 +147,11 @@ impl Lavalink {
         }
 
         None
+    }
+
+    /// Close the connection to the Lavalink server.
+    pub async fn close(&self) -> Result<()> {
+        self.sink().await.close().await.map_err(Error::Tungstenite)
     }
 }
 
