@@ -1,8 +1,4 @@
-use std::{
-    borrow::Borrow,
-    ops::{Deref, DerefMut},
-    sync::RwLock,
-};
+use std::{borrow::Borrow, ops::Deref, sync::RwLock};
 
 use futures::{
     stream::{SplitSink, SplitStream},
