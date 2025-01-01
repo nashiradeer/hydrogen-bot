@@ -12,11 +12,11 @@ pub use rest::*;
 pub use websocket::*;
 
 /// User agent for the REST client.
-pub static LAVALINK_USER_AGENT: &str =
+pub const LAVALINK_USER_AGENT: &str =
     concat!("Hydrogen/", env!("CARGO_PKG_VERSION"), " Hydrolink/2.0.0");
 
 /// Client name for the WebSocket client.
-pub static LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";
+pub const LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";
 
 /// Result type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
