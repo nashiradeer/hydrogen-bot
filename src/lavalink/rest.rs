@@ -4,14 +4,7 @@ use http::{HeaderMap, StatusCode, Uri};
 use reqwest::Client;
 use tokio_tungstenite::{connect_async, tungstenite::ClientRequestBuilder};
 
-use super::{model::*, Error, Lavalink, Result};
-
-/// User agent for the REST client.
-pub static LAVALINK_USER_AGENT: &str =
-    concat!("Hydrogen/", env!("CARGO_PKG_VERSION"), " Hydrolink/2.0.0");
-
-/// Client name for the WebSocket client.
-pub static LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";
+use super::{model::*, Error, Lavalink, Result, LAVALINK_CLIENT_NAME, LAVALINK_USER_AGENT};
 
 #[derive(Debug, Clone)]
 /// REST client for Lavalink.
@@ -61,6 +54,11 @@ impl Rest {
         self.tls
     }
 
+    /// Get the password for the Lavalink server.
+    pub fn password(&self) -> &str {
+        &self.password
+    }
+
     /// Build a URL from a path.
     pub fn build_url(&self, path: &str) -> String {
         format!(
@@ -84,6 +82,26 @@ impl Rest {
             .with_header("Authorization", self.password)
             .with_header("User-Id", user_id)
             .with_header("Client-Name", LAVALINK_CLIENT_NAME);
+
+        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
+
+        Ok(Lavalink::new(connection, self))
+    }
+
+    /// Resume a connection to the Lavalink server.
+    pub async fn resume(self, user_id: String, session_id: String) -> Result<Lavalink> {
+        let uri = Uri::builder()
+            .scheme(if self.tls { "wss" } else { "ws" })
+            .authority(self.host)
+            .path_and_query("/v4/websocket")
+            .build()
+            .map_err(Error::from)?;
+
+        let request = ClientRequestBuilder::new(uri)
+            .with_header("Authorization", self.password)
+            .with_header("User-Id", user_id)
+            .with_header("Client-Name", LAVALINK_CLIENT_NAME)
+            .with_header("Session-Id", session_id);
 
         let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
