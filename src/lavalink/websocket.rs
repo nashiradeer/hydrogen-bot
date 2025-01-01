@@ -1,16 +1,23 @@
-use std::{borrow::Borrow, ops::Deref, sync::RwLock};
+use std::{
+    borrow::Borrow,
+    ops::Deref,
+    sync::{RwLock, RwLockReadGuard},
+};
 
 use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
+use http::Uri;
 use tokio::{
     net::TcpStream,
     sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard},
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async, tungstenite::ClientRequestBuilder, MaybeTlsStream, WebSocketStream,
+};
 
-use super::{model::*, Error, Rest, Result};
+use super::{model::*, Error, Rest, Result, LAVALINK_CLIENT_NAME};
 
 /// A connection to a Lavalink server.
 pub type LavalinkConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -46,9 +53,40 @@ impl Lavalink {
         }
     }
 
+    /// Resume the connection to the Lavalink server.
+    pub async fn resume(&self, user_id: &str) -> Result<()> {
+        let stream = self.stream().await;
+        let sink = self.sink().await;
+
+        let uri = Uri::builder()
+            .scheme(if self.client.tls() { "wss" } else { "ws" })
+            .authority(self.client.host())
+            .path_and_query("/v4/websocket")
+            .build()
+            .map_err(Error::from)?;
+
+        let request = ClientRequestBuilder::new(uri)
+            .with_header("Authorization", self.client.password())
+            .with_header("User-Id", user_id)
+            .with_header("Client-Name", LAVALINK_CLIENT_NAME)
+            .with_header(
+                "Session-Id",
+                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
+            );
+
+        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
+
+        let (new_sink, new_stream) = connection.split();
+
+        *stream = new_stream;
+        *sink = new_sink;
+
+        Ok(())
+    }
+
     /// Get the session ID.
-    pub fn session_id(&self) -> Option<&str> {
-        self.session_id.as_ref()
+    pub fn session_id(&self) -> RwLockReadGuard<Option<String>> {
+        self.session_id.read().unwrap()
     }
 
     /// Get the WebSocket sink.
@@ -69,14 +107,17 @@ impl Lavalink {
     /// Get all players in the session.
     pub async fn get_players(&self) -> Result<Vec<Player>> {
         self.client
-            .get_players(self.session_id().ok_or(Error::NoSessionId)?)
+            .get_players(self.session_id().as_ref().ok_or(Error::NoSessionId)?)
             .await
     }
 
     /// Get the player in the session.
     pub async fn get_player(&self, guild_id: u64) -> Result<Player> {
         self.client
-            .get_player(self.session_id().ok_or(Error::NoSessionId)?, guild_id)
+            .get_player(
+                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
+                guild_id,
+            )
             .await
     }
 
@@ -89,7 +130,7 @@ impl Lavalink {
     ) -> Result<Player> {
         self.client
             .update_player(
-                self.session_id().ok_or(Error::NoSessionId)?,
+                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
                 guild_id,
                 player,
                 no_replace,
@@ -100,7 +141,10 @@ impl Lavalink {
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, guild_id: u64) -> Result<()> {
         self.client
-            .destroy_player(self.session_id().ok_or(Error::NoSessionId)?, guild_id)
+            .destroy_player(
+                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
+                guild_id,
+            )
             .await
     }
 
@@ -110,7 +154,10 @@ impl Lavalink {
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
         self.client
-            .update_session(self.session_id().ok_or(Error::NoSessionId)?, session)
+            .update_session(
+                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
+                session,
+            )
             .await
     }
 
