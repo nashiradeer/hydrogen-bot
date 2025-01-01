@@ -71,6 +71,7 @@ impl Rest {
         )
     }
 
+    /// Connect to the Lavalink server.
     pub async fn connect(self, user_id: String) -> Result<Lavalink> {
         let uri = Uri::builder()
             .scheme(if self.tls { "wss" } else { "ws" })
