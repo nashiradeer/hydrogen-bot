@@ -1,5 +1,6 @@
 //! Lavalink REST client.
 
+use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use reqwest::Client;
 use tokio_tungstenite::{connect_async, tungstenite::ClientRequestBuilder};
@@ -85,7 +86,9 @@ impl Rest {
 
         let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-        Ok(Lavalink::new(connection, self, user_id))
+        let (sink, stream) = connection.split();
+
+        Ok(Lavalink::new(stream, sink, self, user_id))
     }
 
     /// Resume a connection to the Lavalink server.
@@ -105,7 +108,9 @@ impl Rest {
 
         let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-        Ok(Lavalink::new(connection, self, user_id))
+        let (sink, stream) = connection.split();
+
+        Ok(Lavalink::new(stream, sink, self, user_id))
     }
 
     /// Load a track from an identifier.

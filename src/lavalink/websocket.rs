@@ -44,9 +44,7 @@ pub struct Lavalink {
 
 impl Lavalink {
     /// Create a new Lavalink connection.
-    pub fn new(connection: LavalinkConnection, client: Rest, user_id: &str) -> Self {
-        let (sink, stream) = connection.split();
-
+    pub fn new(stream: LavalinkStream, sink: LavalinkSink, client: Rest, user_id: &str) -> Self {
         Self {
             session_id: RwLock::new(None),
             stream: AsyncMutex::new(stream),
@@ -197,10 +195,10 @@ impl Lavalink {
     }
 
     /// Receive the next message from the Lavalink server.
-    pub async fn next(&mut self) -> Option<Result<Message>> {
-        let mut connection = self.stream().await;
+    pub async fn next(&self) -> Option<Result<Message>> {
+        let mut stream = self.stream().await;
 
-        while let Some(msg) = connection.next().await {
+        while let Some(msg) = stream.next().await {
             match msg {
                 Ok(msg) => {
                     let data = match serde_json::from_slice(&msg.into_data()) {
