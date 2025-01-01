@@ -70,7 +70,7 @@ impl Rest {
     }
 
     /// Connect to the Lavalink server.
-    pub async fn connect(self, user_id: String) -> Result<Lavalink> {
+    pub async fn connect(self, user_id: &str) -> Result<Lavalink> {
         let uri = Uri::builder()
             .scheme(if self.tls { "wss" } else { "ws" })
             .authority(self.host)
@@ -85,11 +85,11 @@ impl Rest {
 
         let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-        Ok(Lavalink::new(connection, self))
+        Ok(Lavalink::new(connection, self, user_id))
     }
 
     /// Resume a connection to the Lavalink server.
-    pub async fn resume(self, user_id: String, session_id: String) -> Result<Lavalink> {
+    pub async fn resume(self, user_id: &str, session_id: &str) -> Result<Lavalink> {
         let uri = Uri::builder()
             .scheme(if self.tls { "wss" } else { "ws" })
             .authority(self.host)
@@ -105,7 +105,7 @@ impl Rest {
 
         let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-        Ok(Lavalink::new(connection, self))
+        Ok(Lavalink::new(connection, self, user_id))
     }
 
     /// Load a track from an identifier.
@@ -167,7 +167,7 @@ impl Rest {
     }
 
     /// Get the player in the session.
-    pub async fn get_player(&self, session_id: &str, guild_id: u64) -> Result<Player> {
+    pub async fn get_player(&self, session_id: &str, guild_id: &str) -> Result<Player> {
         self.client
             .get(&self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?trace={}",
@@ -185,7 +185,7 @@ impl Rest {
     pub async fn update_player(
         &self,
         session_id: &str,
-        guild_id: u64,
+        guild_id: &str,
         player: &UpdatePlayer,
         no_replace: Option<bool>,
     ) -> Result<Player> {
@@ -216,7 +216,7 @@ impl Rest {
     }
 
     /// Destroy the player in the session.
-    pub async fn destroy_player(&self, session_id: &str, guild_id: u64) -> Result<()> {
+    pub async fn destroy_player(&self, session_id: &str, guild_id: &str) -> Result<()> {
         self.client
             .delete(&self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?trace={}",

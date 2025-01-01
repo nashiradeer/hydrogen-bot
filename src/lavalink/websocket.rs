@@ -38,11 +38,13 @@ pub struct Lavalink {
     sink: AsyncMutex<LavalinkSink>,
     /// Client used to the Lavalink REST API.
     client: Rest,
+    /// Bot's user ID.
+    user_id: String,
 }
 
 impl Lavalink {
     /// Create a new Lavalink connection.
-    pub fn new(connection: LavalinkConnection, client: Rest) -> Self {
+    pub fn new(connection: LavalinkConnection, client: Rest, user_id: &str) -> Self {
         let (sink, stream) = connection.split();
 
         Self {
@@ -50,11 +52,12 @@ impl Lavalink {
             stream: AsyncMutex::new(stream),
             sink: AsyncMutex::new(sink),
             client,
+            user_id: user_id.to_owned(),
         }
     }
 
-    /// Resume the connection to the Lavalink server.
-    pub async fn resume(&self, user_id: &str) -> Result<()> {
+    /// Connect to the Lavalink server.
+    pub async fn connect(&self) -> Result<()> {
         let stream = self.stream().await;
         let sink = self.sink().await;
 
@@ -67,7 +70,34 @@ impl Lavalink {
 
         let request = ClientRequestBuilder::new(uri)
             .with_header("Authorization", self.client.password())
-            .with_header("User-Id", user_id)
+            .with_header("User-Id", self.user_id())
+            .with_header("Client-Name", LAVALINK_CLIENT_NAME);
+
+        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
+
+        let (new_sink, new_stream) = connection.split();
+
+        *stream = new_stream;
+        *sink = new_sink;
+
+        Ok(())
+    }
+
+    /// Resume the connection to the Lavalink server.
+    pub async fn resume(&self) -> Result<()> {
+        let stream = self.stream().await;
+        let sink = self.sink().await;
+
+        let uri = Uri::builder()
+            .scheme(if self.client.tls() { "wss" } else { "ws" })
+            .authority(self.client.host())
+            .path_and_query("/v4/websocket")
+            .build()
+            .map_err(Error::from)?;
+
+        let request = ClientRequestBuilder::new(uri)
+            .with_header("Authorization", self.client.password())
+            .with_header("User-Id", self.user_id())
             .with_header("Client-Name", LAVALINK_CLIENT_NAME)
             .with_header(
                 "Session-Id",
@@ -82,6 +112,11 @@ impl Lavalink {
         *sink = new_sink;
 
         Ok(())
+    }
+
+    /// Get the user ID.
+    pub fn user_id(&self) -> &str {
+        &self.user_id
     }
 
     /// Get the session ID.
@@ -112,7 +147,7 @@ impl Lavalink {
     }
 
     /// Get the player in the session.
-    pub async fn get_player(&self, guild_id: u64) -> Result<Player> {
+    pub async fn get_player(&self, guild_id: &str) -> Result<Player> {
         self.client
             .get_player(
                 self.session_id().as_ref().ok_or(Error::NoSessionId)?,
@@ -124,7 +159,7 @@ impl Lavalink {
     /// Update the player in the session.
     pub async fn update_player(
         &self,
-        guild_id: u64,
+        guild_id: &str,
         player: &UpdatePlayer,
         no_replace: Option<bool>,
     ) -> Result<Player> {
@@ -139,7 +174,7 @@ impl Lavalink {
     }
 
     /// Destroy the player in the session.
-    pub async fn destroy_player(&self, guild_id: u64) -> Result<()> {
+    pub async fn destroy_player(&self, guild_id: &str) -> Result<()> {
         self.client
             .destroy_player(
                 self.session_id().as_ref().ok_or(Error::NoSessionId)?,
