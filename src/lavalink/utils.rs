@@ -24,7 +24,7 @@ pub async fn connect(
 
     let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-    connection
+    Ok(connection)
 }
 
 /// Reconnect to a Lavalink server, resuming a previous session.
@@ -50,5 +50,5 @@ pub async fn resume_session(
 
     let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
-    connection
+    Ok(connection)
 }
