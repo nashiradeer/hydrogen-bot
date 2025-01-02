@@ -24,6 +24,7 @@ use super::{
 pub const LAVALINK_BUFFER_SIZE: usize = 8;
 
 /// Manages multiple Lavalink nodes using a round-robin strategy and a multi-producer, single-consumer channel to receive messages.
+#[derive(Debug)]
 pub struct Cluster {
     /// List of Lavalink nodes. Need to be immutable to avoid index changes.
     nodes: Vec<Rest>,
