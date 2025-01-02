@@ -787,6 +787,7 @@ dependencies = [
  "dashmap 6.1.0",
  "futures",
  "http 1.1.0",
+ "parking_lot",
  "phf",
  "rand",
  "regex",
