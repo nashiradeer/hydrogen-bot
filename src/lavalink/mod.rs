@@ -3,6 +3,7 @@
 //! An [tokio](https://tokio.rs) based [Lavalink](https://lavalink.dev/) client, with support for any Discord library.
 
 pub mod cluster;
+pub mod hydrogen;
 mod model;
 mod rest;
 mod websocket;
