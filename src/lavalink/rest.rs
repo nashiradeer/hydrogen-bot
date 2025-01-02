@@ -1,11 +1,9 @@
 //! Lavalink REST client.
 
-use futures::StreamExt;
-use http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use reqwest::Client;
-use tokio_tungstenite::{connect_async, tungstenite::ClientRequestBuilder};
 
-use super::{model::*, Error, Lavalink, Result, LAVALINK_CLIENT_NAME, LAVALINK_USER_AGENT};
+use super::{model::*, Error, Result, LAVALINK_USER_AGENT};
 
 #[derive(Debug, Clone)]
 /// REST client for Lavalink.
@@ -73,49 +71,6 @@ impl Rest {
             self.host,
             path
         )
-    }
-
-    /// Connect to the Lavalink server.
-    pub async fn connect(self, user_id: &str) -> Result<Lavalink> {
-        let uri = Uri::builder()
-            .scheme(if self.tls { "wss" } else { "ws" })
-            .authority(self.host.as_str())
-            .path_and_query("/v4/websocket")
-            .build()
-            .map_err(Error::from)?;
-
-        let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", &self.password)
-            .with_header("User-Id", user_id)
-            .with_header("Client-Name", LAVALINK_CLIENT_NAME);
-
-        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
-
-        let (sink, stream) = connection.split();
-
-        Ok(Lavalink::new(stream, sink, self, user_id))
-    }
-
-    /// Resume a connection to the Lavalink server.
-    pub async fn resume(self, user_id: &str, session_id: &str) -> Result<Lavalink> {
-        let uri = Uri::builder()
-            .scheme(if self.tls { "wss" } else { "ws" })
-            .authority(self.host.as_str())
-            .path_and_query("/v4/websocket")
-            .build()
-            .map_err(Error::from)?;
-
-        let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", &self.password)
-            .with_header("User-Id", user_id)
-            .with_header("Client-Name", LAVALINK_CLIENT_NAME)
-            .with_header("Session-Id", session_id);
-
-        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
-
-        let (sink, stream) = connection.split();
-
-        Ok(Lavalink::new(stream, sink, self, user_id))
     }
 
     /// Load a track from an identifier.

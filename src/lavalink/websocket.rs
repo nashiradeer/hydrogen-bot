@@ -1,41 +1,20 @@
-use std::{
-    borrow::Borrow,
-    ops::Deref,
-    sync::{RwLock, RwLockReadGuard},
-};
+use std::{borrow::Borrow, ops::Deref, sync::RwLock};
 
-use futures::{
-    stream::{SplitSink, SplitStream},
-    SinkExt, StreamExt,
-};
-use http::Uri;
-use tokio::{
-    net::TcpStream,
-    sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard},
-};
-use tokio_tungstenite::{
-    connect_async, tungstenite::ClientRequestBuilder, MaybeTlsStream, WebSocketStream,
-};
+use tokio::sync::Mutex as AsyncMutex;
 
-use super::{model::*, Error, Rest, Result, LAVALINK_CLIENT_NAME};
-
-/// A connection to a Lavalink server.
-pub type LavalinkConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
-/// A stream of messages from a Lavalink server.
-pub type LavalinkStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
-/// A sink for sending messages to a Lavalink server.
-pub type LavalinkSink =
-    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
+use super::{
+    model::*,
+    utils::{connect, resume_session},
+    Error, LavalinkConnection, Rest, Result,
+};
 
 #[derive(Debug)]
 /// A connection to a Lavalink server.
 pub struct Lavalink {
     /// Session ID.
     session_id: RwLock<Option<String>>,
-    /// Stream used to receive messages from the Lavalink server.
-    stream: AsyncMutex<LavalinkStream>,
-    /// Sink used to send messages to the Lavalink server.
-    sink: AsyncMutex<LavalinkSink>,
+    /// WebSocket stream.
+    connection: AsyncMutex<LavalinkConnection>,
     /// Client used to the Lavalink REST API.
     client: Rest,
     /// Bot's user ID.
@@ -44,70 +23,55 @@ pub struct Lavalink {
 
 impl Lavalink {
     /// Create a new Lavalink connection.
-    pub fn new(stream: LavalinkStream, sink: LavalinkSink, client: Rest, user_id: &str) -> Self {
+    pub fn new(connection: LavalinkConnection, client: Rest, user_id: &str) -> Self {
         Self {
             session_id: RwLock::new(None),
-            stream: AsyncMutex::new(stream),
-            sink: AsyncMutex::new(sink),
+            connection: AsyncMutex::new(connection),
             client,
             user_id: user_id.to_owned(),
         }
     }
 
+    /// Connect to a Lavalink server.
+    pub async fn connect_from(rest: Rest, user_id: &str) -> Result<Self> {
+        Ok(Self::new(
+            connect(&rest.host(), &rest.host(), rest.tls(), user_id).await?,
+            rest,
+            user_id,
+        ))
+    }
+
+    /// Reconnect to a Lavalink server, resuming a previous session.
+    pub async fn resume_from(rest: Rest, user_id: &str, session_id: &str) -> Result<Self> {
+        Ok(Self::new(
+            resume_session(&rest.host(), &rest.host(), rest.tls(), user_id, session_id).await?,
+            rest,
+            user_id,
+        ))
+    }
+
     /// Connect to the Lavalink server.
+    ///
+    /// WARNING: This method locks the internal connection mutex.
     pub async fn connect(&self) -> Result<()> {
-        let mut stream = self.stream().await;
-        let mut sink = self.sink().await;
-
-        let uri = Uri::builder()
-            .scheme(if self.client.tls() { "wss" } else { "ws" })
-            .authority(self.client.host())
-            .path_and_query("/v4/websocket")
-            .build()
-            .map_err(Error::from)?;
-
-        let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", self.client.password())
-            .with_header("User-Id", self.user_id())
-            .with_header("Client-Name", LAVALINK_CLIENT_NAME);
-
-        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
-
-        let (new_sink, new_stream) = connection.split();
-
-        *stream = new_stream;
-        *sink = new_sink;
+        *self.connection.lock().await =
+            connect(&self.host(), &self.host(), self.tls(), &self.user_id).await?;
 
         Ok(())
     }
 
     /// Resume the connection to the Lavalink server.
+    ///
+    /// WARNING: This method locks the internal connection mutex.
     pub async fn resume(&self) -> Result<()> {
-        let mut stream = self.stream().await;
-        let mut sink = self.sink().await;
-
-        let uri = Uri::builder()
-            .scheme(if self.client.tls() { "wss" } else { "ws" })
-            .authority(self.client.host())
-            .path_and_query("/v4/websocket")
-            .build()
-            .map_err(Error::from)?;
-
-        let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", self.client.password())
-            .with_header("User-Id", self.user_id())
-            .with_header("Client-Name", LAVALINK_CLIENT_NAME)
-            .with_header(
-                "Session-Id",
-                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
-            );
-
-        let (connection, _) = connect_async(request).await.map_err(Error::from)?;
-
-        let (new_sink, new_stream) = connection.split();
-
-        *stream = new_stream;
-        *sink = new_sink;
+        *self.connection.lock().await = resume_session(
+            &self.host(),
+            &self.host(),
+            self.tls(),
+            &self.user_id,
+            self.session_id().as_ref().ok_or(Error::NoSessionId)?,
+        )
+        .await?;
 
         Ok(())
     }
@@ -118,18 +82,8 @@ impl Lavalink {
     }
 
     /// Get the session ID.
-    pub fn session_id(&self) -> RwLockReadGuard<Option<String>> {
-        self.session_id.read().unwrap()
-    }
-
-    /// Get the WebSocket sink.
-    pub async fn sink(&self) -> AsyncMutexGuard<LavalinkSink> {
-        self.sink.lock().await
-    }
-
-    /// Get the WebSocket stream.
-    pub async fn stream(&self) -> AsyncMutexGuard<LavalinkStream> {
-        self.stream.lock().await
+    pub fn session_id(&self) -> Option<String> {
+        self.session_id.read().unwrap().clone()
     }
 
     /// Get the REST client.
@@ -195,10 +149,12 @@ impl Lavalink {
     }
 
     /// Receive the next message from the Lavalink server.
+    ///
+    /// WARNING: This method locks the internal connection mutex.
     pub async fn next(&self) -> Option<Result<Message>> {
-        let mut stream = self.stream().await;
+        let mut connection = self.connection.lock().await;
 
-        while let Some(msg) = stream.next().await {
+        while let Some(msg) = connection.next().await {
             match msg {
                 Ok(msg) => {
                     let data = match serde_json::from_slice(&msg.into_data()) {
@@ -226,8 +182,15 @@ impl Lavalink {
     }
 
     /// Close the connection to the Lavalink server.
+    ///
+    /// WARNING: This method locks the internal connection mutex.
     pub async fn close(&self) -> Result<()> {
-        self.sink().await.close().await.map_err(Error::Tungstenite)
+        self.connection
+            .lock()
+            .await
+            .close(None)
+            .await
+            .map_err(Error::from)
     }
 }
 

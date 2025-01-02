@@ -6,11 +6,14 @@ pub mod cluster;
 pub mod hydrogen;
 mod model;
 mod rest;
+pub(crate) mod utils;
 mod websocket;
 
 use http::header::InvalidHeaderValue;
 pub use model::*;
 pub use rest::*;
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 pub use websocket::*;
 
 /// User agent for the REST client.
@@ -22,6 +25,9 @@ pub const LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";
 
 /// Result type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// A connection to a Lavalink server.
+pub type LavalinkConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[derive(Debug)]
 /// Errors that can occur when interacting with Lavalink.
