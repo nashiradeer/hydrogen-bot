@@ -5,7 +5,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use super::{
     model::*,
-    utils::{connect, resume_session},
+    utils::{connect, parse_message, resume_session},
     Error, LavalinkConnection, Rest, Result,
 };
 
@@ -156,27 +156,21 @@ impl Lavalink {
         let mut connection = self.connection.lock().await;
 
         while let Some(msg) = connection.next().await {
-            match msg {
-                Ok(msg) => {
-                    let data = match serde_json::from_slice(&msg.into_data()) {
-                        Ok(data) => data,
-                        Err(e) => return Some(Err(Error::Serde(e))),
-                    };
+            let data = parse_message(msg);
 
-                    match data {
-                        Message::Ready {
-                            resumed: _,
-                            ref session_id,
-                        } => {
-                            *self.session_id.write().unwrap() = Some(session_id.clone());
-                        }
-                        _ => {}
-                    };
-
-                    return Some(Ok(data));
-                }
-                Err(e) => return Some(Err(Error::Tungstenite(e))),
+            if let Ok(ref data) = data {
+                match data {
+                    Message::Ready {
+                        resumed: _,
+                        ref session_id,
+                    } => {
+                        *self.session_id.write().unwrap() = Some(session_id.clone());
+                    }
+                    _ => {}
+                };
             }
+
+            return Some(data);
         }
 
         None

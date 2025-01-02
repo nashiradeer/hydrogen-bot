@@ -1,7 +1,10 @@
 use http::Uri;
-use tokio_tungstenite::{connect_async, tungstenite::ClientRequestBuilder};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{ClientRequestBuilder, Message as WsMessage, Result as WsResult},
+};
 
-use super::{Error, LavalinkConnection, Result, LAVALINK_CLIENT_NAME};
+use super::{Error, LavalinkConnection, Message, Result, LAVALINK_CLIENT_NAME};
 
 /// Connect to a Lavalink server.
 pub async fn connect(
@@ -51,4 +54,10 @@ pub async fn resume_session(
     let (connection, _) = connect_async(request).await.map_err(Error::from)?;
 
     Ok(connection)
+}
+
+/// Parse a message from the WebSocket connection.
+pub fn parse_message(message: WsResult<WsMessage>) -> Result<Message> {
+    let msg = message.map_err(Error::from)?;
+    serde_json::from_slice(&msg.into_data()).map_err(Error::from)
 }

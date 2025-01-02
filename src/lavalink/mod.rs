@@ -48,6 +48,8 @@ pub enum Error {
     InvalidMessage,
     /// The password provided to the Lavalink server was invalid.
     InvalidHeaderValue(InvalidHeaderValue),
+    /// The Lavalink node is already connected.
+    AlreadyConnected,
 }
 
 impl std::fmt::Display for Error {
@@ -64,6 +66,7 @@ impl std::fmt::Display for Error {
                 "The message received from the Lavalink server was invalid"
             ),
             Self::InvalidHeaderValue(e) => e.fmt(f),
+            Self::AlreadyConnected => write!(f, "The Lavalink node is already connected"),
         }
     }
 }
