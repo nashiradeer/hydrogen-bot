@@ -1,5 +1,6 @@
 use std::{borrow::Borrow, ops::Deref, sync::RwLock};
 
+use futures::StreamExt;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::{
