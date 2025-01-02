@@ -8,6 +8,7 @@ mod model;
 mod rest;
 mod websocket;
 
+use http::header::InvalidHeaderValue;
 pub use model::*;
 pub use rest::*;
 pub use websocket::*;
@@ -22,7 +23,7 @@ pub const LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";
 /// Result type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 /// Errors that can occur when interacting with Lavalink.
 pub enum Error {
     /// An error from [`reqwest`].
@@ -39,6 +40,8 @@ pub enum Error {
     NoSessionId,
     /// The message received from the Lavalink server was invalid.
     InvalidMessage,
+    /// The password provided to the Lavalink server was invalid.
+    InvalidHeaderValue(InvalidHeaderValue),
 }
 
 impl std::fmt::Display for Error {
@@ -46,7 +49,7 @@ impl std::fmt::Display for Error {
         match self {
             Self::Reqwest(e) => e.fmt(f),
             Self::Serde(e) => e.fmt(f),
-            Self::Lavalink(e) => e.fmt(f),
+            Self::Lavalink(e) => write!(f, "Lavalink error: {:?}", e),
             Self::Http(e) => e.fmt(f),
             Self::Tungstenite(e) => e.fmt(f),
             Self::NoSessionId => write!(f, "No session ID was provided"),
@@ -54,6 +57,7 @@ impl std::fmt::Display for Error {
                 f,
                 "The message received from the Lavalink server was invalid"
             ),
+            Self::InvalidHeaderValue(e) => e.fmt(f),
         }
     }
 }
@@ -85,6 +89,12 @@ impl From<http::Error> for Error {
 impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(e: tokio_tungstenite::tungstenite::Error) -> Self {
         Self::Tungstenite(e)
+    }
+}
+
+impl From<InvalidHeaderValue> for Error {
+    fn from(e: InvalidHeaderValue) -> Self {
+        Self::InvalidHeaderValue(e)
     }
 }
 

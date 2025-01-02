@@ -1,7 +1,7 @@
 //! Lavalink REST client.
 
 use futures::StreamExt;
-use http::{HeaderMap, StatusCode, Uri};
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
 use reqwest::Client;
 use tokio_tungstenite::{connect_async, tungstenite::ClientRequestBuilder};
 
@@ -25,9 +25,14 @@ pub struct Rest {
 impl Rest {
     /// Create a new REST client.
     pub fn new(host: &str, password: &str, tls: bool) -> Result<Self> {
+        let headers = [(
+            HeaderName::from_static("Authorization"),
+            HeaderValue::from_str(password).map_err(Error::from)?,
+        )];
+
         let client = Client::builder()
             .user_agent(LAVALINK_USER_AGENT)
-            .default_headers(HeaderMap::from([("Authorization", password)]))
+            .default_headers(HeaderMap::from_iter(headers))
             .build()
             .map_err(Error::from)?;
 
@@ -74,13 +79,13 @@ impl Rest {
     pub async fn connect(self, user_id: &str) -> Result<Lavalink> {
         let uri = Uri::builder()
             .scheme(if self.tls { "wss" } else { "ws" })
-            .authority(self.host)
+            .authority(self.host.as_str())
             .path_and_query("/v4/websocket")
             .build()
             .map_err(Error::from)?;
 
         let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", self.password)
+            .with_header("Authorization", &self.password)
             .with_header("User-Id", user_id)
             .with_header("Client-Name", LAVALINK_CLIENT_NAME);
 
@@ -95,13 +100,13 @@ impl Rest {
     pub async fn resume(self, user_id: &str, session_id: &str) -> Result<Lavalink> {
         let uri = Uri::builder()
             .scheme(if self.tls { "wss" } else { "ws" })
-            .authority(self.host)
+            .authority(self.host.as_str())
             .path_and_query("/v4/websocket")
             .build()
             .map_err(Error::from)?;
 
         let request = ClientRequestBuilder::new(uri)
-            .with_header("Authorization", self.password)
+            .with_header("Authorization", &self.password)
             .with_header("User-Id", user_id)
             .with_header("Client-Name", LAVALINK_CLIENT_NAME)
             .with_header("Session-Id", session_id);
@@ -194,15 +199,6 @@ impl Rest {
         player: &UpdatePlayer,
         no_replace: Option<bool>,
     ) -> Result<Player> {
-        let path = if let Some(no_replace) = no_replace {
-            format!(
-                "/v4/sessions/{}/players/{}?noReplace={}",
-                session_id, guild_id, no_replace
-            )
-        } else {
-            format!("/v4/sessions/{}/players/{}", session_id, guild_id)
-        };
-
         self.client
             .patch(&self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?noReplace={}&trace={}",

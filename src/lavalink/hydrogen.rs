@@ -29,14 +29,11 @@ impl ConfigParser {
                 let password = cap.get(3)?;
 
                 if let Some(query) = cap.get(4) {
-                    Some(Rest::new(
-                        host.as_str(),
-                        password.as_str(),
-                        query.as_str() == "tls",
-                    ))
+                    Rest::new(host.as_str(), password.as_str(), query.as_str() == "tls").ok()
                 } else {
-                    Some(Rest::new(host.as_str(), password.as_str(), false))
+                    Rest::new(host.as_str(), password.as_str(), false).ok()
                 }
             })
+            .collect()
     }
 }

@@ -27,7 +27,7 @@ pub type LavalinkStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>
 pub type LavalinkSink =
     SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 /// A connection to a Lavalink server.
 pub struct Lavalink {
     /// Session ID.
@@ -56,8 +56,8 @@ impl Lavalink {
 
     /// Connect to the Lavalink server.
     pub async fn connect(&self) -> Result<()> {
-        let stream = self.stream().await;
-        let sink = self.sink().await;
+        let mut stream = self.stream().await;
+        let mut sink = self.sink().await;
 
         let uri = Uri::builder()
             .scheme(if self.client.tls() { "wss" } else { "ws" })
@@ -83,8 +83,8 @@ impl Lavalink {
 
     /// Resume the connection to the Lavalink server.
     pub async fn resume(&self) -> Result<()> {
-        let stream = self.stream().await;
-        let sink = self.sink().await;
+        let mut stream = self.stream().await;
+        let mut sink = self.sink().await;
 
         let uri = Uri::builder()
             .scheme(if self.client.tls() { "wss" } else { "ws" })

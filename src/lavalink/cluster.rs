@@ -5,7 +5,6 @@ use std::sync::{
     Arc,
 };
 
-use futures::StreamExt;
 use tokio::sync::mpsc;
 
 use super::{model::*, Lavalink, Result};
