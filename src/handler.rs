@@ -12,7 +12,7 @@ use tokio::{spawn, time::sleep};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    commands, components,
+    commands,
     i18n::t,
     utils::constants::{HYDROGEN_ERROR_COLOR, HYDROGEN_LOGO_URL, HYDROGEN_PRIMARY_COLOR},
     COMPONENTS_MESSAGES, LOADED_COMMANDS,
@@ -40,7 +40,7 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
 }
 
 /// Handles a component interaction.
-pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
+/* pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
     if let Err(e) = component.defer_ephemeral(&context.http).await {
         error!("(handle_component): failed to defer interaction: {}", e);
         return;
@@ -80,7 +80,7 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
             }
         }
     }
-}
+} */
 
 /// Registers the commands.
 pub async fn register_commands(http: impl AsRef<Http>) -> bool {
