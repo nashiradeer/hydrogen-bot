@@ -12,11 +12,11 @@ pub const HYDROGEN_EMPTY_CHAT_TIMEOUT: u64 = 10;
 /// How many music tracks can be stored in the queue.
 pub const HYDROGEN_QUEUE_LIMIT: usize = 1000;
 
-/// Prefix used to search for tracks on Lavalink.
-pub const HYDROGEN_SEARCH_PREFIX: &str = "ytsearch:";
+/// The search prefixes for the music.
+pub static HYDROGEN_SEARCH_PREFIXES: [&str; 3] = ["ytsearch:", "dzsearch:", "scsearch:"];
 
-/// Connection timeout for the Lavalink node.
-pub const LAVALINK_CONNECTION_TIMEOUT: u64 = 5_000;
+/// Connection timeout for the Lavalink node in seconds.
+pub const LAVALINK_RECONNECTION_DELAY: u64 = 5;
 
 /// Hydrogen's logo URL, used in embed's footers.
 pub static HYDROGEN_LOGO_URL: &str =
