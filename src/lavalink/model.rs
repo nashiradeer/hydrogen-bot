@@ -31,11 +31,11 @@ pub enum Message {
     /// Dispatched when the node sends stats once per minute.
     Stats {
         /// The amount of players connected to the node.
-        players: i32,
+        players: u32,
         /// The amount of players playing a track.
-        playing_players: i32,
+        playing_players: u32,
         /// The uptime of the node in milliseconds.
-        uptime: i64,
+        uptime: u64,
         /// The memory stats of the node.
         memory: Memory,
         /// The cpu stats of the node.
@@ -54,9 +54,9 @@ pub enum Message {
 /// State of the player.
 pub struct PlayerState {
     /// Unix timestamp in milliseconds.
-    pub time: i64,
+    pub time: u64,
     /// The position of the track in milliseconds.
-    pub position: i64,
+    pub position: u64,
     /// Whether Lavalink is connected to the voice gateway.
     pub connected: bool,
     /// The ping of the node to the Discord voice server in milliseconds. (-1 if not connected)
@@ -68,13 +68,13 @@ pub struct PlayerState {
 /// Memory statistics of the Lavalink node.
 pub struct Memory {
     /// The amount of free memory in bytes.
-    pub free: i32,
+    pub free: u64,
     /// The amount of used memory in bytes.
-    pub used: i32,
+    pub used: u64,
     /// The amount of allocated memory in bytes.
-    pub allocated: i32,
+    pub allocated: u64,
     /// The amount of reservable memory in bytes.
-    pub reservable: i32,
+    pub reservable: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,7 +82,7 @@ pub struct Memory {
 /// CPU statistics of the Lavalink node.
 pub struct CPU {
     /// The amount of cores the node has.
-    pub cores: i32,
+    pub cores: u16,
     /// The system load of the node.
     pub system_load: f32,
     /// The load of Lavalink on the node.
@@ -94,11 +94,11 @@ pub struct CPU {
 /// Frame statistics of the Lavalink node.
 pub struct FrameStats {
     /// The amount of frames sent to Discord.
-    pub sent: i32,
+    pub sent: u32,
     /// The amount of frames that were nulled.
-    pub nulled: i32,
+    pub nulled: u32,
     /// The difference between sent frames and the expected amount of frames.
-    pub deficit: i32,
+    pub deficit: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,7 +144,7 @@ pub enum Event {
         /// The track that got stuck.
         track: Track,
         /// The threshold in milliseconds that was exceeded.
-        threshold_ms: i32,
+        threshold_ms: u32,
     },
 
     #[serde(rename_all = "camelCase", rename = "WebSocketClosedEvent")]
@@ -153,7 +153,7 @@ pub enum Event {
         /// The guild id.
         guild_id: String,
         /// The [Discord close event code](https://discord.com/developers/docs/topics/opcodes-and-status-codes#voice-voice-close-event-codes).
-        code: i32,
+        code: u32,
         /// The close reason.
         reason: String,
         /// Whether the connection was closed by Discord.
@@ -191,11 +191,11 @@ pub struct TrackInfo {
     /// The track author.
     pub author: String,
     /// The track length in milliseconds.
-    pub length: i64,
+    pub length: u64,
     /// Whether the track is a stream.
     pub is_stream: bool,
     /// The track position in milliseconds.
-    pub position: i64,
+    pub position: u64,
     /// The track title.
     pub title: String,
     /// The track uri.
@@ -208,7 +208,7 @@ pub struct TrackInfo {
     pub source_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Reasons a track has ended.
 pub enum TrackEndReason {
@@ -256,7 +256,7 @@ pub struct Error {
     pub timestamp: i64,
 
     /// The HTTP status code.
-    pub status: i32,
+    pub status: u32,
 
     /// The HTTP status code message.
     pub error: String,
@@ -280,6 +280,15 @@ pub enum LavalinkResult<T> {
     Ok(T),
     /// Represents an error result.
     Err(Error),
+}
+
+impl<T> Into<Result<T, super::Error>> for LavalinkResult<T> {
+    fn into(self) -> Result<T, super::Error> {
+        match self {
+            LavalinkResult::Ok(value) => Ok(value),
+            LavalinkResult::Err(err) => Err(err.into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,6 +327,33 @@ pub enum LoadResult {
     Error(Exception),
 }
 
+impl LoadResult {
+    /// Check if the result is a track.
+    pub fn is_track(&self) -> bool {
+        matches!(self, Self::Track(_))
+    }
+
+    /// Check if the result is a playlist.
+    pub fn is_playlist(&self) -> bool {
+        matches!(self, Self::Playlist { .. })
+    }
+
+    /// Check if the result is a search.
+    pub fn is_search(&self) -> bool {
+        matches!(self, Self::Search(_))
+    }
+
+    /// Check if the result is empty.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    /// Check if the result is an error.
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// A player in the Lavalink node.
@@ -327,7 +363,7 @@ pub struct Player {
     /// The currently playing track.
     pub track: Option<Track>,
     /// The volume of the player, range 0-1000, in percentage.
-    pub volume: i16,
+    pub volume: u16,
     /// Whether the player is paused.
     pub paused: bool,
     /// The state of the player.
@@ -404,7 +440,7 @@ pub struct Filters {
 /// There are 15 bands (0-14) that can be changed. "gain" is the multiplier for the given band. The default value is 0. Valid values range from -0.25 to 1.0, where -0.25 means the given band is completely muted, and 0.25 means it is doubled. Modifying the gain could also change the volume of the output.
 pub struct Equalizer {
     /// The band. (0 to 14)
-    pub band: i8,
+    pub band: u8,
     /// The gain. (-0.25 to 1.0)
     pub gain: f32,
 }
@@ -567,7 +603,7 @@ pub struct UpdatePlayer {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The player volume, in percentage, from 0 to 1000.
-    pub volume: Option<i16>,
+    pub volume: Option<u16>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Whether the player is paused.
@@ -582,7 +618,7 @@ pub struct UpdatePlayer {
     pub voice: Option<VoiceState>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Update the player's track.
 pub struct UpdatePlayerTrack {
@@ -609,7 +645,7 @@ pub struct UpdateSessionRequest {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The timeout in seconds. (default is 60s)
-    pub timeout: Option<i32>,
+    pub timeout: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -619,7 +655,7 @@ pub struct UpdateSessionResponse {
     /// Whether resuming is enabled for this session or not.
     pub resuming: bool,
     /// The timeout in seconds. (default is 60s)
-    pub timeout: i32,
+    pub timeout: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -651,11 +687,11 @@ pub struct Version {
     /// The full version string of this Lavalink server.
     pub semver: String,
     /// The major version of this Lavalink server.
-    pub major: i32,
+    pub major: u8,
     /// The minor version of this Lavalink server.
-    pub minor: i32,
+    pub minor: u8,
     /// The patch version of this Lavalink server.
-    pub patch: i32,
+    pub patch: u8,
     /// The pre-release version according to semver as a `.` separated list of identifiers.
     pub pre_release: Option<String>,
     /// The build metadata according to semver as a `.` separated list of identifiers.

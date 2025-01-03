@@ -103,7 +103,7 @@ pub struct Track {
     /// Cache ID of the track's requester.
     pub requester: UserId,
     /// The track's duration.
-    pub duration: i64,
+    pub duration: u64,
     /// The track's URL for the user.
     pub url: Option<String>,
     /// The track's thumbnail.
