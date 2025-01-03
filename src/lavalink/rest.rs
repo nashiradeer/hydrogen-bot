@@ -3,7 +3,7 @@
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use reqwest::Client;
 
-use super::{model::*, Error, Result, LAVALINK_USER_AGENT};
+use super::{model::*, Error, LavalinkResult, Result, LAVALINK_USER_AGENT};
 
 #[derive(Debug, Clone)]
 /// REST client for Lavalink.
@@ -24,7 +24,7 @@ impl Rest {
     /// Create a new REST client.
     pub fn new(host: &str, password: &str, tls: bool) -> Result<Self> {
         let headers = [(
-            HeaderName::from_static("Authorization"),
+            HeaderName::from_static("authorization"),
             HeaderValue::from_str(password).map_err(Error::from)?,
         )];
 
@@ -83,9 +83,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Decode a base64 track.
@@ -98,9 +99,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Decode multiple base64 tracks.
@@ -111,9 +113,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Get all players in the session.
@@ -126,9 +129,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Get the player in the session.
@@ -141,9 +145,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Update the player in the session.
@@ -166,9 +171,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Destroy the player in the session.
@@ -198,9 +204,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Get information about the Lavalink server.
@@ -210,9 +217,10 @@ impl Rest {
             .send()
             .await
             .map_err(Error::from)?
-            .json()
+            .json::<LavalinkResult<_>>()
             .await
-            .map_err(Error::from)
+            .map_err(Error::from)?
+            .into()
     }
 
     /// Get the Lavalink version.
@@ -239,7 +247,12 @@ impl Rest {
         if response.status() == StatusCode::NO_CONTENT {
             Ok(None)
         } else {
-            response.json().await.map(Some).map_err(Error::from)
+            response
+                .json::<LavalinkResult<RoutePlanner>>()
+                .await
+                .map_err(Error::from)
+                .and_then(|result| result.into())
+                .map(Some)
         }
     }
 
