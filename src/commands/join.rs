@@ -6,7 +6,7 @@ use tracing::{error, info, warn};
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
     i18n::{serenity_command_description, serenity_command_name, t_vars},
-    LOADED_COMMANDS, MANAGER,
+    LOADED_COMMANDS, PLAYER_MANAGER,
 };
 
 /// Executes the `/join` command.
@@ -26,7 +26,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
             error!("(commands::join): the manager is not initialized");
@@ -34,7 +34,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     };
 
-    if manager.contains_player(guild_id).await {
+    if manager.contains_player(guild_id) {
         info!(
             "(commands::join): a player already exists in the guild {}",
             guild_id
@@ -87,12 +87,11 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     if let Err(e) = manager
         .init(
             guild_id,
+            interaction.channel_id,
             &interaction
                 .guild_locale
                 .clone()
                 .unwrap_or(interaction.locale.clone()),
-            voice_manager.clone(),
-            interaction.channel_id,
         )
         .await
     {

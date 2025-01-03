@@ -3,7 +3,7 @@
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
@@ -11,8 +11,8 @@ use crate::{
         serenity_command_description, serenity_command_name, serenity_command_option_description,
         serenity_command_option_name, t, t_vars,
     },
-    player::HydrogenPlayCommand,
-    MANAGER,
+    music::PlayResult,
+    PLAYER_MANAGER,
 };
 
 /// Executes the `/play` command.
@@ -32,7 +32,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
             error!("(commands::play): the manager is not initialized");
@@ -128,16 +128,15 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     }
 
     let result = match manager
-        .init_or_play(
+        .play(
+            query,
+            interaction.user.id,
             guild_id,
+            interaction.channel_id,
             &interaction
                 .guild_locale
                 .clone()
                 .unwrap_or(interaction.locale.clone()),
-            query,
-            interaction.user.id,
-            voice_manager.clone(),
-            interaction.channel_id,
         )
         .await
     {
@@ -196,17 +195,18 @@ pub fn create_command() -> CreateCommand {
 }
 
 /// Get the message to send to the user.
-fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) -> String {
+fn get_message(result: PlayResult, interaction: &CommandInteraction) -> String {
+    debug!("(commands::play): getting message for: {:?}", result);
     if let Some(track) = result.track {
         if result.playing && result.count == 1 {
-            if let Some(uri) = track.uri {
+            if let Some(url) = track.url {
                 return t_vars(
                     &interaction.locale,
                     "play.play_single_url",
                     [
                         ("name", track.title),
                         ("author", track.author),
-                        ("url", uri),
+                        ("url", url),
                     ],
                 );
             } else {
@@ -217,14 +217,14 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                 );
             }
         } else if result.count == 1 {
-            if let Some(uri) = track.uri {
+            if let Some(url) = track.url {
                 return t_vars(
                     &interaction.locale,
                     "play.enqueue_single_url",
                     [
                         ("name", track.title),
                         ("author", track.author),
-                        ("url", uri),
+                        ("url", url),
                     ],
                 );
             } else {
@@ -236,14 +236,14 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
             }
         } else if result.playing {
             if !result.truncated {
-                if let Some(uri) = track.uri {
+                if let Some(url) = track.url {
                     t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
                         [
                             ("name", track.title),
                             ("author", track.author),
-                            ("url", uri),
+                            ("url", url),
                             ("count", result.count.to_string()),
                         ],
                     );
@@ -258,7 +258,7 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                         ],
                     );
                 }
-            } else if let Some(uri) = track.uri {
+            } else if let Some(url) = track.url {
                 return format!(
                     "{}\n\n{}",
                     t(&interaction.locale, "play.truncated_warn"),
@@ -268,7 +268,7 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                         [
                             ("name", track.title),
                             ("author", track.author),
-                            ("url", uri),
+                            ("url", url),
                             ("count", result.count.to_string()),
                         ]
                     ),

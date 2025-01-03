@@ -2,15 +2,15 @@ use std::{
     collections::HashMap,
     env,
     process::exit,
-    sync::{LazyLock, OnceLock},
-    time::Instant,
+    sync::{Arc, LazyLock, OnceLock},
 };
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
-use lavalink::LavalinkNodeInfo;
-use manager::HydrogenManager;
+use handler::{handle_command, register_commands, AutoRemoverKey};
+use lavalink::{cluster::Cluster, Rest};
+use music::PlayerManager;
+use parking_lot::Mutex;
 use serenity::{
     all::{
         Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Ready,
@@ -20,33 +20,29 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
 };
 
 mod commands;
-mod components;
+//mod components;
 mod handler;
 mod i18n;
 pub mod lavalink;
-mod manager;
-mod player;
+mod music;
 mod utils;
 
 /// The commands IDs that are registered.
 pub static LOADED_COMMANDS: OnceLock<HashMap<String, CommandId>> = OnceLock::new();
 
 /// Hydrogen's Player Manager.
-pub static MANAGER: OnceLock<HydrogenManager> = OnceLock::new();
+pub static PLAYER_MANAGER: OnceLock<PlayerManager> = OnceLock::new();
 
 /// The messages from the components.
 pub static COMPONENTS_MESSAGES: LazyLock<
     DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
 > = LazyLock::new(DashMap::new);
-
-/// Lavalink node.
-pub static LAVALINK_NODE: OnceLock<LavalinkNodeInfo> = OnceLock::new();
 
 #[tokio::main]
 /// Hydrogen's main function.
@@ -56,14 +52,11 @@ async fn main() {
         .with(EnvFilter::from_default_env())
         .init();
 
-    LAVALINK_NODE
-        .set(LavalinkNodeInfo {
-            host: env::var("LAVALINK_HOST").expect("LAVALINK_HOST is not set or invalid unicode"),
-            password: env::var("LAVALINK_PASSWORD")
-                .expect("LAVALINK_PASSWORD is not set or invalid unicode"),
-            tls: env::var_os("LAVALINK_TLS").is_some(),
-        })
-        .expect("cannot set LAVALINK_NODE");
+    let lavalink_nodes = init_lavalink();
+
+    if lavalink_nodes.is_empty() {
+        panic!("no Lavalink nodes found");
+    }
 
     let mut client = Client::builder(
         env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN is not set or invalid unicode"),
@@ -72,7 +65,13 @@ async fn main() {
             | GatewayIntents::MESSAGE_CONTENT
             | GatewayIntents::GUILD_MESSAGES,
     )
-    .event_handler(HydrogenHandler)
+    .event_handler(HydrogenHandler {
+        lavalink_nodes: Mutex::new(Some(lavalink_nodes)),
+        ready_span: info_span!("ready"),
+        interaction_span: info_span!("interaction"),
+        voice_state_span: info_span!("voice_state"),
+        voice_server_span: info_span!("voice_server"),
+    })
     .register_songbird()
     .await
     .expect("cannot initialize client");
@@ -80,124 +79,102 @@ async fn main() {
     client.start().await.expect("cannot start client");
 }
 
-pub struct HydrogenHandler;
+fn init_lavalink() -> Vec<Rest> {
+    let lavalink_builder =
+        lavalink::hydrogen::ConfigParser::new().expect("cannot create ConfigParser");
+
+    lavalink_builder.parse(env::var("LAVALINK").expect("LAVALINK is not set or invalid unicode"))
+}
+
+pub struct HydrogenHandler {
+    lavalink_nodes: Mutex<Option<Vec<Rest>>>,
+    ready_span: Span,
+    interaction_span: Span,
+    voice_state_span: Span,
+    voice_server_span: Span,
+}
 
 #[async_trait]
 impl EventHandler for HydrogenHandler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let timer = Instant::now();
-        debug!("(ready): processing...");
+        let _entered = self.ready_span.enter();
 
-        if MANAGER
-            .set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()))
+        let Some(songbird) = songbird::get(&ctx).await else {
+            error!("(ready): cannot get Songbird from Context, is it initialized?");
+            exit(1);
+        };
+
+        let Some(lavalink_nodes) = self.lavalink_nodes.lock().take() else {
+            error!("(ready): cannot get the Lavalink nodes, is it initialized?");
+            exit(1);
+        };
+
+        if PLAYER_MANAGER
+            .set(
+                PlayerManager::new(
+                    songbird,
+                    Arc::new(Cluster::new(lavalink_nodes, &ready.user.id.to_string()).await),
+                    ctx.cache.clone(),
+                    ctx.http.clone(),
+                )
+                .await,
+            )
             .is_err()
         {
-            error!("(ready): cannot set HydrogenManager in OnceLock");
+            error!("(ready): cannot set PlayerManager in OnceLock");
             exit(1);
         }
 
-        debug!("(ready): HydrogenManager initialized");
+        debug!("(ready): PlayerManager initialized");
 
         if !register_commands(&ctx.http).await {
             error!("(ready): cannot register commands");
             exit(1);
         }
 
-        let Some(manager) = MANAGER.get() else {
-            error!("(ready): cannot get HydrogenManager from OnceLock");
-            exit(1);
-        };
-
-        let Some(lavalink_node) = LAVALINK_NODE.get() else {
-            error!("(ready): cannot get LavalinkNodeInfo from OnceLock");
-            exit(1);
-        };
-
-        if manager
-            .connect_lavalink(lavalink_node.clone())
-            .await
-            .is_err()
-        {
-            error!("(ready): cannot connect to Lavalink");
-            exit(1);
-        }
-
-        info!(
-            "(ready): client connected to '{}' in {}ms",
-            ready.user.name,
-            timer.elapsed().as_millis()
-        );
+        info!("(ready): client connected to '{}'", ready.user.name,);
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let timer = Instant::now();
-        debug!("(interaction_create): processing...");
+        let _entered = self.interaction_span.enter();
 
         match interaction {
             Interaction::Command(command) => {
-                handle_command(&ctx, &command).await;
-
                 info!(
-                    "(interaction_create): command '{}' executed in {}ms",
+                    "(interaction_create): executing command '{}'...",
                     command.data.name,
-                    timer.elapsed().as_millis()
                 );
+
+                handle_command(&ctx, &command).await;
             }
             Interaction::Component(component) => {
-                handle_component(&ctx, &component).await;
-
                 info!(
-                    "(interaction_create): component '{}' executed in {}ms",
+                    "(interaction_create): executing component '{}'...",
                     component.data.custom_id,
-                    timer.elapsed().as_millis()
                 );
+
+                //handle_component(&ctx, &component).await;
             }
             _ => (),
         }
     }
 
     async fn voice_state_update(&self, _: Context, old: Option<VoiceState>, new: VoiceState) {
-        let timer = Instant::now();
-        debug!("(voice_state_update): processing...");
+        let _entered = self.voice_state_span.enter();
 
-        if let Some(manager) = MANAGER.get() {
-            match manager.update_voice_state(old, new).await {
-                Ok(updated) => {
-                    if updated {
-                        info!(
-                            "(voice_state_update): processed in {}ms...",
-                            timer.elapsed().as_millis()
-                        );
-                    } else {
-                        debug!("(voice_state_update): ignored");
-                    }
-                }
-                Err(e) => {
-                    warn!("(voice_state_update): cannot update the HydrogenManager's player voice state: {}", e);
-                }
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_state(old, new).await {
+                warn!("(voice_state_update): cannot update the HydrogenManager's player voice state: {}", e);
             }
         }
     }
 
     async fn voice_server_update(&self, _: Context, voice_server: VoiceServerUpdateEvent) {
-        let timer = Instant::now();
-        debug!("(voice_server_update): processing...");
+        let _entered = self.voice_server_span.enter();
 
-        if let Some(manager) = MANAGER.get() {
-            match manager.update_voice_server(voice_server).await {
-                Ok(updated) => {
-                    if updated {
-                        info!(
-                            "(voice_server_update): processed in {}ms...",
-                            timer.elapsed().as_millis()
-                        );
-                    } else {
-                        debug!("(voice_server_update): ignored");
-                    }
-                }
-                Err(e) => {
-                    warn!("(voice_server_update): cannot update HydrogenManager's player voice server: {}", e);
-                }
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_server(voice_server).await {
+                warn!("(voice_server_update): cannot update HydrogenManager's player voice server: {}", e);
             }
         }
     }
