@@ -26,9 +26,9 @@ impl ConfigParser {
             .captures_iter(&value)
             .filter_map(|cap| {
                 let host = cap.get(1)?;
-                let password = cap.get(3)?;
+                let password = cap.get(2)?;
 
-                if let Some(query) = cap.get(4) {
+                if let Some(query) = cap.get(3) {
                     Rest::new(host.as_str(), password.as_str(), query.as_str() == "tls").ok()
                 } else {
                     Rest::new(host.as_str(), password.as_str(), false).ok()
