@@ -9,10 +9,9 @@ use std::{
 };
 
 use futures::StreamExt;
-use parking_lot::RwLock;
 use tokio::{
     select,
-    sync::{mpsc, Mutex as AsyncMutex, Notify},
+    sync::{mpsc, Mutex as AsyncMutex, Notify, RwLock as AsyncRwLock},
 };
 
 use super::{
@@ -37,7 +36,7 @@ pub struct Cluster {
     /// Index for the round-robin strategy.
     index: AtomicUsize,
     /// The session ID from each node connection.
-    session_id: Arc<RwLock<HashMap<usize, String>>>,
+    session_id: Arc<AsyncRwLock<HashMap<usize, String>>>,
     /// The user ID to be used by the nodes.
     user_id: String,
 }
@@ -53,14 +52,14 @@ impl Cluster {
             receiver: AsyncMutex::new(receiver),
             index: AtomicUsize::new(0),
             notifier: Arc::new(Notify::new()),
-            session_id: Arc::new(RwLock::new(HashMap::new())),
+            session_id: Arc::new(AsyncRwLock::new(HashMap::new())),
             user_id: user_id.to_owned(),
         }
     }
 
     /// Connect a node to the Lavalink server if it is not already connected.
     pub async fn connect(&self, index: usize) -> Result<()> {
-        if self.is_connected(index) {
+        if self.is_connected(index).await {
             return Err(Error::AlreadyConnected);
         }
 
@@ -84,7 +83,7 @@ impl Cluster {
                                         resumed: _,
                                         ref session_id,
                                     } => {
-                                        session_id_storage.write().insert(index, session_id.clone());
+                                        session_id_storage.write().await.insert(index, session_id.clone());
                                         ()
                                     }
                                     _ => {}
@@ -102,6 +101,7 @@ impl Cluster {
                 };
             }
 
+            session_id_storage.write().await.remove(&index);
             _ = sender.send((index, None)).await;
         });
 
@@ -114,21 +114,21 @@ impl Cluster {
     }
 
     /// Get the list of connected nodes.
-    pub fn connected_nodes(&self) -> Vec<usize> {
-        self.session_id.read().keys().copied().collect()
+    pub async fn connected_nodes(&self) -> Vec<usize> {
+        self.session_id.read().await.keys().copied().collect()
     }
 
     /// Get the list of disconnected nodes.
-    pub fn disconnected_nodes(&self) -> Vec<usize> {
-        let connected = self.connected_nodes();
+    pub async fn disconnected_nodes(&self) -> Vec<usize> {
+        let connected = self.connected_nodes().await;
         (0..self.nodes.len())
             .filter(|x| !connected.contains(x))
             .collect()
     }
 
     /// Check if a node is connected.
-    pub fn is_connected(&self, index: usize) -> bool {
-        self.session_id.read().contains_key(&index)
+    pub async fn is_connected(&self, index: usize) -> bool {
+        self.session_id.read().await.contains_key(&index)
     }
 
     /// Get the current index.
@@ -148,10 +148,10 @@ impl Cluster {
     /// Search for a connected node, returning the index if found or [None] if there is no connected node.
     ///
     /// This method uses the round-robin strategy to search for a connected node.
-    pub fn search_connected_node(&self) -> Option<usize> {
+    pub async fn search_connected_node(&self) -> Option<usize> {
         for _ in 0..self.nodes.len() {
             let index = self.next_index();
-            if self.is_connected(index) {
+            if self.is_connected(index).await {
                 return Some(index);
             }
         }
@@ -165,6 +165,7 @@ impl Cluster {
             .get_players(
                 self.session_id
                     .read()
+                    .await
                     .get(&index)
                     .ok_or(Error::NoSessionId)?,
             )
@@ -177,6 +178,7 @@ impl Cluster {
             .get_player(
                 self.session_id
                     .read()
+                    .await
                     .get(&index)
                     .ok_or(Error::NoSessionId)?,
                 guild_id,
@@ -196,6 +198,7 @@ impl Cluster {
             .update_player(
                 self.session_id
                     .read()
+                    .await
                     .get(&index)
                     .ok_or(Error::NoSessionId)?,
                 guild_id,
@@ -211,6 +214,7 @@ impl Cluster {
             .destroy_player(
                 self.session_id
                     .read()
+                    .await
                     .get(&index)
                     .ok_or(Error::NoSessionId)?,
                 guild_id,
@@ -228,6 +232,7 @@ impl Cluster {
             .update_session(
                 self.session_id
                     .read()
+                    .await
                     .get(&index)
                     .ok_or(Error::NoSessionId)?,
                 session,
