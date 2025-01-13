@@ -237,7 +237,7 @@ fn get_message(result: PlayResult, interaction: &CommandInteraction) -> String {
         } else if result.playing {
             if !result.truncated {
                 if let Some(url) = track.url {
-                    t_vars(
+                    return t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
                         [
