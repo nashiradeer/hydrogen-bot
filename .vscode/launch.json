@@ -12,10 +12,7 @@
           "kind": "bin"
         }
       },
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "RUST_LOG": "hydrogen=debug"
-      }
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

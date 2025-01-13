@@ -21,6 +21,5 @@
       ]
     }
   },
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "postCreateCommand": ".devcontainer/setup.sh"
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
 }

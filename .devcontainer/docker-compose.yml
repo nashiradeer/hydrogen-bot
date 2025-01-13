@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   app:
     build:
@@ -9,10 +8,10 @@ services:
     depends_on:
       - lavalink
     env_file:
-      - dev/.env
+      - ../dev/.env
     command: sleep infinity
   lavalink:
-    image: fredboat/lavalink:4.0.8-alpine
+    image: ghcr.io/lavalink-devs/lavalink:4.0.8-alpine
     restart: unless-stopped
     volumes:
       - lavalink-plugins:/opt/Lavalink/plugins/
@@ -24,4 +23,4 @@ volumes:
   lavalink-plugins:
 configs:
   lavalink-config:
-    file: dev/application.yml
+    file: ../dev/application.yml
