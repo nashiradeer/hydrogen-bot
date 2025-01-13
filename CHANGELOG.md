@@ -1,5 +1,17 @@
 # Hydrogen // Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Change Lavalink configuration to the new database URL-like format.
+- Implement cluster support in the Lavalink client.
+- Implement a database URL-like configuration for Lavalink.
+- Reimplement the Lavalink client using v4 API.
+- Reimplement the Lavalink client to use Enum-returning functions (like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
+- Update to Alpine 3.21.
+- Update to Rust 1.84.0.
+
 ## [0.0.1-alpha.11] - 2024-11-06
 
 ### Fixed
