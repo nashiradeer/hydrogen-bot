@@ -3,7 +3,7 @@
 ## 0.0.1-alpha.12
 
 - [x] Create a Dev Container. ([#7](https://github.com/nashiradeer/hydrogen-bot/issues/7))
-- [ ] Fix play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+- [x] Fix play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 - [ ] Recreate the Music Player message system.
 - [ ] Reimplement loop_switch component.
 - [ ] Reimplement pause component.
