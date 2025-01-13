@@ -7,7 +7,6 @@ pub use player::*;
 use tokio::time::sleep;
 
 use std::{
-    collections::HashMap,
     error::Error as StdError,
     fmt::{self, Display, Formatter},
     result::Result as StdResult,
@@ -127,7 +126,7 @@ impl PlayerManager {
                 message_id: None,
                 paused: false,
                 primary_queue: Vec::new(),
-                secondary_queue: None,
+                _secondary_queue: None,
                 text_channel: Some(text_channel),
                 voice_channel: ChannelId::new(
                     connection_info
@@ -138,7 +137,6 @@ impl PlayerManager {
                 ),
                 session_id: connection_info.session_id.clone(),
                 token: connection_info.token.clone(),
-                user_locales: HashMap::new(),
             },
         );
 
@@ -190,8 +188,6 @@ impl PlayerManager {
                 self.players.get_mut(&guild_id).unwrap()
             }
         };
-
-        player.user_locales.insert(requester, locale.to_owned());
 
         let lavalink_node = &self.lavalink.nodes()[player.node_id];
 

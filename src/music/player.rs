@@ -20,7 +20,7 @@ pub struct Player {
     /// The queue of tracks.
     pub primary_queue: Vec<Track>,
     /// The secondary queue of tracks for PlayTogether.
-    pub secondary_queue: Option<Vec<Track>>,
+    pub _secondary_queue: Option<Vec<Track>>,
     /// The current track being played.
     pub currrent_track: usize,
     /// The loop mode of the player.
@@ -39,8 +39,6 @@ pub struct Player {
     pub endpoint: String,
     /// The handle for the player's destroy task.
     pub destroy_handle: Option<JoinHandle<()>>,
-    /// The user's locales.
-    pub user_locales: HashMap<UserId, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
