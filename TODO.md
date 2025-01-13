@@ -37,6 +37,8 @@
 - [ ] Create the about command.
 - [ ] Create the donate command.
 - [ ] Create the report command.
+- [ ] Create the invite command.
+- [ ] Create a command to set Music Player language.
 - [ ] Update dependencies. (if needed)
 
 ## 0.0.1-alpha.15
