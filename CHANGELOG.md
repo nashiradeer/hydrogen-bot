@@ -12,6 +12,10 @@
 - Update to Alpine 3.21.
 - Update to Rust 1.84.0.
 
+### Fixed
+
+- Wrong play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+
 ## [0.0.1-alpha.11] - 2024-11-06
 
 ### Fixed
