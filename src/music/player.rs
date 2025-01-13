@@ -1,9 +1,6 @@
 //! Player information and structures.
 
-use std::{
-    collections::HashMap,
-    fmt::{self, Display, Formatter},
-};
+use std::fmt::{self, Display, Formatter};
 
 use serenity::all::{ChannelId, MessageId, ReactionType, UserId};
 use tokio::task::JoinHandle;
