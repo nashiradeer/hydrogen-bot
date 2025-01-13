@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ../..:/workspaces:cached
+    depends_on:
+      - lavalink
+    env_file:
+      - dev/.env
+    command: sleep infinity
+  lavalink:
+    image: fredboat/lavalink:4.0.8-alpine
+    restart: unless-stopped
+    volumes:
+      - lavalink-plugins:/opt/Lavalink/plugins/
+    configs:
+      - source: lavalink-config
+        target: /opt/Lavalink/application.yml
+volumes:
+  # DevContainer will prefix the volume name with the workspace folder name
+  lavalink-plugins:
+configs:
+  lavalink-config:
+    file: dev/application.yml

@@ -12,7 +12,6 @@
           "kind": "bin"
         }
       },
-      "envFile": "${workspaceFolder}/.env",
       "cwd": "${workspaceFolder}",
       "env": {
         "RUST_LOG": "hydrogen=debug"

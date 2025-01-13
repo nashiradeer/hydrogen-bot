@@ -1,4 +1,4 @@
 /target
-/dev
-/.direnv
-.env
+/dev/**
+!/dev/README.md
+!/dev/_*
