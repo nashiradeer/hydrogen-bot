@@ -1,8 +1,10 @@
 //! Module for the Hydrogen's music player.
 
 mod lavalink;
+mod message;
 mod player;
 
+use message::update_message;
 pub use player::*;
 use tokio::time::sleep;
 
@@ -142,7 +144,8 @@ impl PlayerManager {
 
         drop(call_lock);
 
-        // TODO: update message
+        let mut player = self.players.get_mut(&guild_id).unwrap();
+        update_message(self, &mut player, guild_id, false).await;
 
         Ok(())
     }
@@ -387,13 +390,16 @@ impl PlayerManager {
                 .len();
 
             if members_count <= 1 {
-                self.timed_destroy(guild_id, Duration::from_secs(HYDROGEN_EMPTY_CHAT_TIMEOUT))
-                    .await;
+                self.inner_timed_destroy(
+                    guild_id,
+                    &mut player,
+                    Duration::from_secs(HYDROGEN_EMPTY_CHAT_TIMEOUT),
+                );
 
-                // TODO: update message
+                update_message(self, &mut player, guild_id, true).await;
             } else {
                 self.cancel_destroy(&mut player).await;
-                // TODO: update message
+                update_message(self, &mut player, guild_id, false).await;
             }
         }
 
@@ -521,9 +527,16 @@ impl PlayerManager {
 
         self.start_player(guild_id, &player).await?;
 
-        // TODO: update message
+        update_message(self, &mut player, guild_id, false).await;
 
         Ok(())
+    }
+
+    /// Update the player message.
+    pub async fn update_message(&self, guild_id: GuildId) {
+        if let Some(mut player) = self.players.get_mut(&guild_id) {
+            update_message(self, &mut player, guild_id, false).await;
+        };
     }
 }
 

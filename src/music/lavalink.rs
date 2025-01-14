@@ -78,16 +78,18 @@ async fn process_data(message: Message, player_manager: &PlayerManager) {
 /// Process the Lavalink event.
 async fn process_event(event: Event, player_manager: &PlayerManager) {
     match event {
+        Event::TrackStart { guild_id, .. } => {
+            if let Some(guild_id) = u64::from_str_radix(&guild_id, 10).ok().map(GuildId::new) {
+                player_manager.update_message(guild_id).await;
+            }
+        }
         Event::TrackEnd {
             guild_id, reason, ..
         } => {
             if reason == TrackEndReason::Finished || reason == TrackEndReason::LoadFailed {
                 if let Some(guild_id) = u64::from_str_radix(&guild_id, 10).ok().map(GuildId::new) {
                     if let Err(e) = player_manager.next_track(guild_id).await {
-                        error!(
-                            "(music): failed to play the next track in guild {}: {}",
-                            guild_id, e
-                        );
+                        error!("failed to play the next track in guild {}: {}", guild_id, e);
                     }
                 }
             }
