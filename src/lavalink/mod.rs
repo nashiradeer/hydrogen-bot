@@ -55,18 +55,15 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Reqwest(e) => e.fmt(f),
-            Self::Serde(e) => e.fmt(f),
+            Self::Reqwest(e) => write!(f, "Reqwest error: {}", e),
+            Self::Serde(e) => write!(f, "Serde error: {}", e),
             Self::Lavalink(e) => write!(f, "Lavalink error: {:?}", e),
-            Self::Http(e) => e.fmt(f),
-            Self::Tungstenite(e) => e.fmt(f),
+            Self::Http(e) => write!(f, "HTTP error: {}", e),
+            Self::Tungstenite(e) => write!(f, "Tungstenite error: {}", e),
+            Self::InvalidHeaderValue(e) => write!(f, "Invalid header value: {}", e),
             Self::NoSessionId => write!(f, "No session ID was provided"),
-            Self::InvalidMessage => write!(
-                f,
-                "The message received from the Lavalink server was invalid"
-            ),
-            Self::InvalidHeaderValue(e) => e.fmt(f),
-            Self::AlreadyConnected => write!(f, "The Lavalink node is already connected"),
+            Self::InvalidMessage => write!(f, "Lavalink sent an invalid message"),
+            Self::AlreadyConnected => write!(f, "Lavalink node is already connected"),
         }
     }
 }
