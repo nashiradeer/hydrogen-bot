@@ -176,7 +176,7 @@ pub struct Track {
     pub plugin_info: HashMap<String, Value>,
 
     #[serde(default)]
-    /// Additional track data provided via the TODO endpoint.
+    /// Additional track data provided via the [super::Rest::update_player] endpoint.
     pub user_data: HashMap<String, Value>,
 }
 
