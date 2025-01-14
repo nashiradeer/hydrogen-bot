@@ -575,16 +575,16 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Lavalink(e) => write!(f, "Lavalink error: {}", e),
+            Self::Join(e) => write!(f, "Join error: {}", e),
+            Self::Serenity(e) => write!(f, "Serenity error: {}", e),
             Self::VoiceNotConnected => write!(
                 f,
                 "There's no voice connection for the guild in the voice manager"
             ),
             Self::NoAvailableLavalink => write!(f, "There's no available Lavalink node"),
-            Self::Lavalink(e) => e.fmt(f),
             Self::InvalidGuildId => write!(f, "Invalid guild ID"),
-            Self::Join(e) => e.fmt(f),
-            Self::Serenity(e) => e.fmt(f),
-            Self::GuildChannelNotFound => write!(f, "The guild channel was not found"),
+            Self::GuildChannelNotFound => write!(f, "Guild channel was not found"),
         }
     }
 }
