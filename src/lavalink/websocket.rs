@@ -158,16 +158,8 @@ impl Lavalink {
         while let Some(msg) = connection.next().await {
             let data = parse_message(msg);
 
-            if let Ok(ref data) = data {
-                match data {
-                    Message::Ready {
-                        resumed: _,
-                        ref session_id,
-                    } => {
-                        *self.session_id.write().unwrap() = Some(session_id.clone());
-                    }
-                    _ => {}
-                };
+            if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
+                *self.session_id.write().unwrap() = Some(msg.session_id.clone());
             }
 
             return Some(data);

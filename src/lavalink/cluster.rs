@@ -77,20 +77,11 @@ impl Cluster {
                         if let Some(msg) = message {
                             let data = parse_message(msg);
 
-                            if let Ok(ref data) = data {
-                                match data {
-                                    Message::Ready {
-                                        resumed: _,
-                                        ref session_id,
-                                    } => {
-                                        session_id_storage.write().await.insert(index, session_id.clone());
-                                        ()
-                                    }
-                                    _ => {}
-                                };
+                            if let Some(data) = data.as_ref().ok().and_then(|v| v.as_ready()) {
+                                session_id_storage.write().await.insert(index, data.session_id.clone());
                             }
 
-                            if let Err(_) = sender.send((index, Some(data))).await {
+                            if sender.send((index, Some(data))).await.is_err() {
                                 break;
                             }
                         } else {

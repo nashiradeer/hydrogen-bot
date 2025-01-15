@@ -9,44 +9,194 @@ use serde_json::Value;
 #[serde(tag = "op", rename_all = "camelCase")]
 /// WebSocket message received from Lavalink server.
 pub enum Message {
-    #[serde(rename_all = "camelCase")]
     /// Dispatched when you successfully connect to the Lavalink node.
-    Ready {
-        /// Whether this session was resumed.
-        resumed: bool,
-        /// The Lavalink session id of this connection. Not to be confused with a Discord voice session id.
-        session_id: String,
-    },
-
-    #[serde(rename_all = "camelCase")]
+    Ready(Ready),
     /// Dispatched every x seconds with the latest player state.
-    PlayerUpdate {
-        /// The guild id of the player.
-        guild_id: String,
-        /// The player state.
-        state: PlayerState,
-    },
-
-    #[serde(rename_all = "camelCase")]
+    PlayerUpdate(PlayerUpdate),
     /// Dispatched when the node sends stats once per minute.
-    Stats {
-        /// The amount of players connected to the node.
-        players: u32,
-        /// The amount of players playing a track.
-        playing_players: u32,
-        /// The uptime of the node in milliseconds.
-        uptime: u64,
-        /// The memory stats of the node.
-        memory: Memory,
-        /// The cpu stats of the node.
-        cpu: CPU,
-        /// The frame stats of the node. [Option::None] if the node has no players or when retrieved via `/v4/stats`.
-        frame_stats: Option<FrameStats>,
-    },
-
-    #[serde(rename_all = "camelCase")]
+    Stats(Stats),
     /// Dispatched when player or voice events occur.
     Event(Event),
+}
+
+impl Message {
+    /// Get the guild id of the message.
+    pub fn guild_id(&self) -> Option<&String> {
+        match self {
+            Message::PlayerUpdate(player_update) => Some(&player_update.guild_id),
+            Message::Event(event) => Some(event.guild_id()),
+            _ => None,
+        }
+    }
+
+    /// Get the kind of message.
+    pub fn kind(&self) -> MessageKind {
+        match self {
+            Message::Ready(_) => MessageKind::Ready,
+            Message::PlayerUpdate(_) => MessageKind::PlayerUpdate,
+            Message::Stats(_) => MessageKind::Stats,
+            Message::Event(_) => MessageKind::Event,
+        }
+    }
+
+    /// Check if the message is ready.
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready(_))
+    }
+
+    /// Check if the message is a player update.
+    pub fn is_player_update(&self) -> bool {
+        matches!(self, Self::PlayerUpdate(_))
+    }
+
+    /// Check if the message is stats.
+    pub fn is_stats(&self) -> bool {
+        matches!(self, Self::Stats(_))
+    }
+
+    /// Check if the message is an event.
+    pub fn is_event(&self) -> bool {
+        matches!(self, Self::Event(_))
+    }
+
+    /// Convert the message to ready.
+    pub fn to_ready(self) -> Option<Ready> {
+        match self {
+            Message::Ready(ready) => Some(ready),
+            _ => None,
+        }
+    }
+
+    /// Convert the message to player update.
+    pub fn to_player_update(self) -> Option<PlayerUpdate> {
+        match self {
+            Message::PlayerUpdate(player_update) => Some(player_update),
+            _ => None,
+        }
+    }
+
+    /// Convert the message to stats.
+    pub fn to_stats(self) -> Option<Stats> {
+        match self {
+            Message::Stats(stats) => Some(stats),
+            _ => None,
+        }
+    }
+
+    /// Convert the message to event.
+    pub fn to_event(self) -> Option<Event> {
+        match self {
+            Message::Event(event) => Some(event),
+            _ => None,
+        }
+    }
+
+    /// Get the ready message.
+    pub fn as_ready(&self) -> Option<&Ready> {
+        match self {
+            Message::Ready(ready) => Some(ready),
+            _ => None,
+        }
+    }
+
+    /// Get the player update message.
+    pub fn as_player_update(&self) -> Option<&PlayerUpdate> {
+        match self {
+            Message::PlayerUpdate(player_update) => Some(player_update),
+            _ => None,
+        }
+    }
+
+    /// Get the stats message.
+    pub fn as_stats(&self) -> Option<&Stats> {
+        match self {
+            Message::Stats(stats) => Some(stats),
+            _ => None,
+        }
+    }
+
+    /// Get the event message.
+    pub fn as_event(&self) -> Option<&Event> {
+        match self {
+            Message::Event(event) => Some(event),
+            _ => None,
+        }
+    }
+}
+
+impl From<Ready> for Message {
+    fn from(ready: Ready) -> Self {
+        Self::Ready(ready)
+    }
+}
+
+impl From<PlayerUpdate> for Message {
+    fn from(player_update: PlayerUpdate) -> Self {
+        Self::PlayerUpdate(player_update)
+    }
+}
+
+impl From<Stats> for Message {
+    fn from(stats: Stats) -> Self {
+        Self::Stats(stats)
+    }
+}
+
+impl From<Event> for Message {
+    fn from(event: Event) -> Self {
+        Self::Event(event)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The kind of message received from the Lavalink server.
+pub enum MessageKind {
+    /// Dispatched when you successfully connect to the Lavalink node.
+    Ready,
+    /// Dispatched every x seconds with the latest player state.
+    PlayerUpdate,
+    /// Dispatched when the node sends stats once per minute.
+    Stats,
+    /// Dispatched when player or voice events occur.
+    Event,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when you successfully connect to the Lavalink node.
+pub struct Ready {
+    /// Whether this session was resumed.
+    pub resumed: bool,
+    /// The Lavalink session id of this connection. Not to be confused with a Discord voice session id.
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched every x seconds with the latest player state.
+pub struct PlayerUpdate {
+    /// The guild id of the player.
+    pub guild_id: String,
+    /// The player state.
+    pub state: PlayerState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when the node sends stats once per minute.
+pub struct Stats {
+    /// The amount of players connected to the node.
+    pub players: u32,
+    /// The amount of players playing a track.
+    pub playing_players: u32,
+    /// The uptime of the node in milliseconds.
+    pub uptime: u64,
+    /// The memory stats of the node.
+    pub memory: Memory,
+    /// The cpu stats of the node.
+    pub cpu: CPU,
+    /// The frame stats of the node. [Option::None] if the node has no players or when retrieved via `/v4/stats`.
+    pub frame_stats: Option<FrameStats>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,60 +255,270 @@ pub struct FrameStats {
 #[serde(tag = "type", rename_all = "camelCase")]
 /// Websocket event received from Lavalink server.
 pub enum Event {
-    #[serde(rename_all = "camelCase", rename = "TrackStartEvent")]
+    #[serde(rename = "TrackStartEvent")]
     /// Dispatched when a track starts playing.
-    TrackStart {
-        /// The guild id.
-        guild_id: String,
-        /// The track that started playing.
-        track: Track,
-    },
+    TrackStart(TrackStartEvent),
 
-    #[serde(rename_all = "camelCase", rename = "TrackEndEvent")]
+    #[serde(rename = "TrackEndEvent")]
     /// Dispatched when a track ends.
-    TrackEnd {
-        /// The guild id.
-        guild_id: String,
-        /// The track that ended playing.
-        track: Track,
-        /// The reason the track ended.
-        reason: TrackEndReason,
-    },
+    TrackEnd(TrackEndEvent),
 
-    #[serde(rename_all = "camelCase", rename = "TrackExceptionEvent")]
+    #[serde(rename = "TrackExceptionEvent")]
     /// Dispatched when a track throws an exception.
-    TrackException {
-        /// The guild id.
-        guild_id: String,
-        /// The track that threw the exception
-        track: Track,
-        /// The occurred exception.
-        exception: Exception,
-    },
+    TrackException(TrackExceptionEvent),
 
-    #[serde(rename_all = "camelCase", rename = "TrackStuckEvent")]
+    #[serde(rename = "TrackStuckEvent")]
     /// Dispatched when a track gets stuck while playing.
-    TrackStuck {
-        /// The guild id.
-        guild_id: String,
-        /// The track that got stuck.
-        track: Track,
-        /// The threshold in milliseconds that was exceeded.
-        threshold_ms: u32,
-    },
+    TrackStuck(TrackStuckEvent),
 
-    #[serde(rename_all = "camelCase", rename = "WebSocketClosedEvent")]
+    #[serde(rename = "WebSocketClosedEvent")]
     /// Dispatched when an audio WebSocket (to Discord) is closed. This can happen for various reasons (normal and abnormal), e.g. when using an expired voice server update. 4xxx codes are usually bad. See the [Discord Docs](https://discord.com/developers/docs/topics/opcodes-and-status-codes#voice-voice-close-event-codes).
-    WebSocketClosed {
-        /// The guild id.
-        guild_id: String,
-        /// The [Discord close event code](https://discord.com/developers/docs/topics/opcodes-and-status-codes#voice-voice-close-event-codes).
-        code: u32,
-        /// The close reason.
-        reason: String,
-        /// Whether the connection was closed by Discord.
-        by_remote: bool,
-    },
+    WebSocketClosed(WebSocketClosedEvent),
+}
+
+impl Event {
+    /// Get the kind of event.
+    pub fn kind(&self) -> EventKind {
+        match self {
+            Event::TrackStart(_) => EventKind::TrackStart,
+            Event::TrackEnd(_) => EventKind::TrackEnd,
+            Event::TrackException(_) => EventKind::TrackException,
+            Event::TrackStuck(_) => EventKind::TrackStuck,
+            Event::WebSocketClosed(_) => EventKind::WebSocketClosed,
+        }
+    }
+
+    /// Get the guild id of the event.
+    pub fn guild_id(&self) -> &String {
+        match self {
+            Event::TrackStart(track_start) => &track_start.guild_id,
+            Event::TrackEnd(track_end) => &track_end.guild_id,
+            Event::TrackException(track_exception) => &track_exception.guild_id,
+            Event::TrackStuck(track_stuck) => &track_stuck.guild_id,
+            Event::WebSocketClosed(websocket_closed) => &websocket_closed.guild_id,
+        }
+    }
+
+    /// Get the track of the event.
+    pub fn track(&self) -> Option<&Track> {
+        match self {
+            Event::TrackStart(track_start) => Some(&track_start.track),
+            Event::TrackEnd(track_end) => Some(&track_end.track),
+            Event::TrackException(track_exception) => Some(&track_exception.track),
+            Event::TrackStuck(track_stuck) => Some(&track_stuck.track),
+            _ => None,
+        }
+    }
+
+    /// Check if the event is a track start.
+    pub fn is_track_start(&self) -> bool {
+        matches!(self, Self::TrackStart(_))
+    }
+
+    /// Check if the event is a track end.
+    pub fn is_track_end(&self) -> bool {
+        matches!(self, Self::TrackEnd(_))
+    }
+
+    /// Check if the event is a track exception.
+    pub fn is_track_exception(&self) -> bool {
+        matches!(self, Self::TrackException(_))
+    }
+
+    /// Check if the event is a track stuck.
+    pub fn is_track_stuck(&self) -> bool {
+        matches!(self, Self::TrackStuck(_))
+    }
+
+    /// Check if the event is a websocket closed.
+    pub fn is_websocket_closed(&self) -> bool {
+        matches!(self, Self::WebSocketClosed(_))
+    }
+
+    /// Convert the event to track start.
+    pub fn to_track_start(self) -> Option<TrackStartEvent> {
+        match self {
+            Event::TrackStart(track_start) => Some(track_start),
+            _ => None,
+        }
+    }
+
+    /// Convert the event to track end.
+    pub fn to_track_end(self) -> Option<TrackEndEvent> {
+        match self {
+            Event::TrackEnd(track_end) => Some(track_end),
+            _ => None,
+        }
+    }
+
+    /// Convert the event to track exception.
+    pub fn to_track_exception(self) -> Option<TrackExceptionEvent> {
+        match self {
+            Event::TrackException(track_exception) => Some(track_exception),
+            _ => None,
+        }
+    }
+
+    /// Convert the event to track stuck.
+    pub fn to_track_stuck(self) -> Option<TrackStuckEvent> {
+        match self {
+            Event::TrackStuck(track_stuck) => Some(track_stuck),
+            _ => None,
+        }
+    }
+
+    /// Convert the event to websocket closed.
+    pub fn to_websocket_closed(self) -> Option<WebSocketClosedEvent> {
+        match self {
+            Event::WebSocketClosed(websocket_closed) => Some(websocket_closed),
+            _ => None,
+        }
+    }
+
+    /// Get the track start event.
+    pub fn as_track_start(&self) -> Option<&TrackStartEvent> {
+        match self {
+            Event::TrackStart(track_start) => Some(track_start),
+            _ => None,
+        }
+    }
+
+    /// Get the track end event.
+    pub fn as_track_end(&self) -> Option<&TrackEndEvent> {
+        match self {
+            Event::TrackEnd(track_end) => Some(track_end),
+            _ => None,
+        }
+    }
+
+    /// Get the track exception event.
+    pub fn as_track_exception(&self) -> Option<&TrackExceptionEvent> {
+        match self {
+            Event::TrackException(track_exception) => Some(track_exception),
+            _ => None,
+        }
+    }
+
+    /// Get the track stuck event.
+    pub fn as_track_stuck(&self) -> Option<&TrackStuckEvent> {
+        match self {
+            Event::TrackStuck(track_stuck) => Some(track_stuck),
+            _ => None,
+        }
+    }
+
+    /// Get the websocket closed event.
+    pub fn as_websocket_closed(&self) -> Option<&WebSocketClosedEvent> {
+        match self {
+            Event::WebSocketClosed(websocket_closed) => Some(websocket_closed),
+            _ => None,
+        }
+    }
+}
+
+impl From<TrackStartEvent> for Event {
+    fn from(track_start: TrackStartEvent) -> Self {
+        Self::TrackStart(track_start)
+    }
+}
+
+impl From<TrackEndEvent> for Event {
+    fn from(track_end: TrackEndEvent) -> Self {
+        Self::TrackEnd(track_end)
+    }
+}
+
+impl From<TrackExceptionEvent> for Event {
+    fn from(track_exception: TrackExceptionEvent) -> Self {
+        Self::TrackException(track_exception)
+    }
+}
+
+impl From<TrackStuckEvent> for Event {
+    fn from(track_stuck: TrackStuckEvent) -> Self {
+        Self::TrackStuck(track_stuck)
+    }
+}
+
+impl From<WebSocketClosedEvent> for Event {
+    fn from(websocket_closed: WebSocketClosedEvent) -> Self {
+        Self::WebSocketClosed(websocket_closed)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The kind of event received from the Lavalink server.
+pub enum EventKind {
+    /// Dispatched when a track starts playing.
+    TrackStart,
+    /// Dispatched when a track ends.
+    TrackEnd,
+    /// Dispatched when a track throws an exception.
+    TrackException,
+    /// Dispatched when a track gets stuck while playing.
+    TrackStuck,
+    /// Dispatched when an audio WebSocket (to Discord) is closed.
+    WebSocketClosed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when a track starts playing.
+pub struct TrackStartEvent {
+    /// The guild id.
+    pub guild_id: String,
+    /// The track that started playing.
+    pub track: Track,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when a track ends.
+pub struct TrackEndEvent {
+    /// The guild id.
+    pub guild_id: String,
+    /// The track that ended playing.
+    pub track: Track,
+    /// The reason the track ended.
+    pub reason: TrackEndReason,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when a track throws an exception.
+pub struct TrackExceptionEvent {
+    /// The guild id.
+    pub guild_id: String,
+    /// The track that threw the exception
+    pub track: Track,
+    /// The occurred exception.
+    pub exception: Exception,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when a track gets stuck while playing.
+pub struct TrackStuckEvent {
+    /// The guild id.
+    pub guild_id: String,
+    /// The track that got stuck.
+    pub track: Track,
+    /// The threshold in milliseconds that was exceeded.
+    pub threshold_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Dispatched when an audio WebSocket (to Discord) is closed. This can happen for various reasons (normal and abnormal), e.g. when using an expired voice server update. 4xxx codes are usually bad. See the [Discord Docs](https://discord.com/developers/docs/topics/opcodes-and-status-codes#voice-voice-close-event-codes).
+pub struct WebSocketClosedEvent {
+    /// The guild id.
+    pub guild_id: String,
+    /// The [Discord close event code](https://discord.com/developers/docs/topics/opcodes-and-status-codes#voice-voice-close-event-codes).
+    pub code: u32,
+    /// The close reason.
+    pub reason: String,
+    /// Whether the connection was closed by Discord.
+    pub by_remote: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,7 +568,7 @@ pub struct TrackInfo {
     pub source_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Reasons a track has ended.
 pub enum TrackEndReason {
@@ -224,6 +584,16 @@ pub enum TrackEndReason {
     Cleanup,
 }
 
+impl TrackEndReason {
+    /// Check if the next track should start.
+    pub fn may_start_next(&self) -> bool {
+        match self {
+            Self::Finished | Self::LoadFailed => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Represents an exception thrown by the Lavalink node.
@@ -236,7 +606,7 @@ pub struct Exception {
     pub cause: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Represents the severity of an exception.
 pub enum Severity {
@@ -308,17 +678,7 @@ pub enum LoadResult {
     /// A track has been loaded.
     Track(Track),
     /// A playlist has been loaded.
-    Playlist {
-        /// The info of the playlist.
-        info: PlaylistInfo,
-
-        #[serde(default)]
-        /// Addition playlist info provided by plugins.
-        plugin_info: HashMap<String, Value>,
-
-        /// The tracks of the playlist.
-        tracks: Vec<Track>,
-    },
+    Playlist(LoadResultPlaylist),
     /// A search result has been loaded.
     Search(Vec<Track>),
     /// There has been no matches for your identifier.
@@ -328,6 +688,17 @@ pub enum LoadResult {
 }
 
 impl LoadResult {
+    /// Get the kind of load result.
+    pub fn kind(&self) -> LoadResultKind {
+        match self {
+            LoadResult::Track(_) => LoadResultKind::Track,
+            LoadResult::Playlist(_) => LoadResultKind::Playlist,
+            LoadResult::Search(_) => LoadResultKind::Search,
+            LoadResult::Empty => LoadResultKind::Empty,
+            LoadResult::Error(_) => LoadResultKind::Error,
+        }
+    }
+
     /// Check if the result is a track.
     pub fn is_track(&self) -> bool {
         matches!(self, Self::Track(_))
@@ -352,6 +723,100 @@ impl LoadResult {
     pub fn is_error(&self) -> bool {
         matches!(self, Self::Error(_))
     }
+
+    /// Convert the result to a track.
+    pub fn to_track(self) -> Option<Track> {
+        match self {
+            LoadResult::Track(track) => Some(track),
+            _ => None,
+        }
+    }
+
+    /// Convert the result to a playlist.
+    pub fn to_playlist(self) -> Option<LoadResultPlaylist> {
+        match self {
+            LoadResult::Playlist(playlist) => Some(playlist),
+            _ => None,
+        }
+    }
+
+    /// Convert the result to a search.
+    pub fn to_search(self) -> Option<Vec<Track>> {
+        match self {
+            LoadResult::Search(tracks) => Some(tracks),
+            _ => None,
+        }
+    }
+
+    /// Convert the result to an error.
+    pub fn to_error(self) -> Option<Exception> {
+        match self {
+            LoadResult::Error(exception) => Some(exception),
+            _ => None,
+        }
+    }
+
+    /// Get the track result.
+    pub fn as_track(&self) -> Option<&Track> {
+        match self {
+            LoadResult::Track(track) => Some(track),
+            _ => None,
+        }
+    }
+
+    /// Get the playlist result.
+    pub fn as_playlist(&self) -> Option<&LoadResultPlaylist> {
+        match self {
+            LoadResult::Playlist(playlist) => Some(playlist),
+            _ => None,
+        }
+    }
+
+    /// Get the search result.
+    pub fn as_search(&self) -> Option<&Vec<Track>> {
+        match self {
+            LoadResult::Search(tracks) => Some(tracks),
+            _ => None,
+        }
+    }
+
+    /// Get the error result.
+    pub fn as_error(&self) -> Option<&Exception> {
+        match self {
+            LoadResult::Error(exception) => Some(exception),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The kind of load result.
+pub enum LoadResultKind {
+    /// A track has been loaded.
+    Track,
+    /// A playlist has been loaded.
+    Playlist,
+    /// A search result has been loaded.
+    Search,
+    /// There has been no matches for your identifier.
+    Empty,
+    /// Loading has failed with an error.
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Represents the result of a load playlist operation.
+pub struct LoadResultPlaylist {
+    /// The info of the playlist.
+    pub info: PlaylistInfo,
+
+    #[serde(default)]
+    /// Addition playlist info provided by plugins.
+    pub plugin_info: HashMap<String, Value>,
+
+    /// The tracks of the playlist.
+    pub tracks: Vec<Track>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -726,51 +1191,233 @@ pub struct Plugin {
 pub enum RoutePlanner {
     #[serde(rename = "RotatingIpRoutePlanner")]
     /// IP address used is switched on ban. Recommended for IPv4 blocks or IPv6 blocks smaller than a /64.
-    Rotating {
-        /// The ip block being used.
-        ip_block: IPBlock,
-        /// The failing addresses.
-        failing_addresses: Vec<FailingAddress>,
-        /// The number of rotations.
-        rotate_index: String,
-        /// The current offset in the block.
-        ip_index: String,
-        /// The current address being used.
-        current_address: String,
-    },
+    Rotating(RotatingIpRoutePlanner),
 
     #[serde(rename = "NanoIpRoutePlanner")]
     /// IP address used is switched on clock update. Use with at least 1 /64 IPv6 block.
-    Nano {
-        /// The ip block being used.
-        ip_block: IPBlock,
-        /// The failing addresses.
-        failing_addresses: Vec<FailingAddress>,
-        /// The current offset in the ip block.
-        current_address_index: String,
-    },
+    Nano(NanoIpRoutePlanner),
 
     #[serde(rename = "RotatingNanoIpRoutePlanner")]
     /// IP address used is switched on clock update, rotates to a different /64 block on ban. Use with at least 2x /64 IPv6 blocks.
-    RotatingNano {
-        /// The ip block being used.
-        ip_block: IPBlock,
-        /// The failing addresses.
-        failing_addresses: Vec<FailingAddress>,
-        /// The current offset in the ip block.
-        current_address_index: String,
-        /// The information in which /64 block ips are chosen. This number increases on each ban.
-        block_index: String,
-    },
+    RotatingNano(RotatingNanoIpRoutePlanner),
 
     #[serde(rename = "BalancingIpRoutePlanner")]
     /// IP address used is selected at random per request. Recommended for larger IP blocks.
-    Balancing {
-        /// The ip block being used.
-        ip_block: IPBlock,
-        /// The failing addresses.
-        failing_addresses: Vec<FailingAddress>,
-    },
+    Balancing(BalancingIpRoutePlanner),
+}
+
+impl RoutePlanner {
+    /// Get the ip block being used.
+    pub fn ip_block(&self) -> &IPBlock {
+        match self {
+            RoutePlanner::Rotating(route_planner) => &route_planner.ip_block,
+            RoutePlanner::Nano(route_planner) => &route_planner.ip_block,
+            RoutePlanner::RotatingNano(route_planner) => &route_planner.ip_block,
+            RoutePlanner::Balancing(route_planner) => &route_planner.ip_block,
+        }
+    }
+
+    /// Get the failing addresses.
+    pub fn failing_addresses(&self) -> &Vec<FailingAddress> {
+        match self {
+            RoutePlanner::Rotating(route_planner) => &route_planner.failing_addresses,
+            RoutePlanner::Nano(route_planner) => &route_planner.failing_addresses,
+            RoutePlanner::RotatingNano(route_planner) => &route_planner.failing_addresses,
+            RoutePlanner::Balancing(route_planner) => &route_planner.failing_addresses,
+        }
+    }
+
+    /// Get the current address being used.
+    pub fn current_address_index(&self) -> Option<&String> {
+        match self {
+            RoutePlanner::Nano(route_planner) => Some(&route_planner.current_address_index),
+            RoutePlanner::RotatingNano(route_planner) => Some(&route_planner.current_address_index),
+            _ => None,
+        }
+    }
+
+    /// Get the kind of route planner.
+    pub fn kind(&self) -> RoutePlannerKind {
+        match self {
+            RoutePlanner::Rotating(_) => RoutePlannerKind::Rotating,
+            RoutePlanner::Nano(_) => RoutePlannerKind::Nano,
+            RoutePlanner::RotatingNano(_) => RoutePlannerKind::RotatingNano,
+            RoutePlanner::Balancing(_) => RoutePlannerKind::Balancing,
+        }
+    }
+
+    /// Check if the route planner is rotating.
+    pub fn is_rotating(&self) -> bool {
+        matches!(self, Self::Rotating(_))
+    }
+
+    /// Check if the route planner is nano.
+    pub fn is_nano(&self) -> bool {
+        matches!(self, Self::Nano(_))
+    }
+
+    /// Check if the route planner is rotating nano.
+    pub fn is_rotating_nano(&self) -> bool {
+        matches!(self, Self::RotatingNano(_))
+    }
+
+    /// Check if the route planner is balancing.
+    pub fn is_balancing(&self) -> bool {
+        matches!(self, Self::Balancing(_))
+    }
+
+    /// Convert the route planner to rotating.
+    pub fn to_rotating(self) -> Option<RotatingIpRoutePlanner> {
+        match self {
+            RoutePlanner::Rotating(rotating) => Some(rotating),
+            _ => None,
+        }
+    }
+
+    /// Convert the route planner to nano.
+    pub fn to_nano(self) -> Option<NanoIpRoutePlanner> {
+        match self {
+            RoutePlanner::Nano(nano) => Some(nano),
+            _ => None,
+        }
+    }
+
+    /// Convert the route planner to rotating nano.
+    pub fn to_rotating_nano(self) -> Option<RotatingNanoIpRoutePlanner> {
+        match self {
+            RoutePlanner::RotatingNano(rotating_nano) => Some(rotating_nano),
+            _ => None,
+        }
+    }
+
+    /// Convert the route planner to balancing.
+    pub fn to_balancing(self) -> Option<BalancingIpRoutePlanner> {
+        match self {
+            RoutePlanner::Balancing(balancing) => Some(balancing),
+            _ => None,
+        }
+    }
+
+    /// Get the rotating route planner.
+    pub fn as_rotating(&self) -> Option<&RotatingIpRoutePlanner> {
+        match self {
+            RoutePlanner::Rotating(rotating) => Some(rotating),
+            _ => None,
+        }
+    }
+
+    /// Get the nano route planner.
+    pub fn as_nano(&self) -> Option<&NanoIpRoutePlanner> {
+        match self {
+            RoutePlanner::Nano(nano) => Some(nano),
+            _ => None,
+        }
+    }
+
+    /// Get the rotating nano route planner.
+    pub fn as_rotating_nano(&self) -> Option<&RotatingNanoIpRoutePlanner> {
+        match self {
+            RoutePlanner::RotatingNano(rotating_nano) => Some(rotating_nano),
+            _ => None,
+        }
+    }
+
+    /// Get the balancing route planner.
+    pub fn as_balancing(&self) -> Option<&BalancingIpRoutePlanner> {
+        match self {
+            RoutePlanner::Balancing(balancing) => Some(balancing),
+            _ => None,
+        }
+    }
+}
+
+impl From<RotatingIpRoutePlanner> for RoutePlanner {
+    fn from(route_planner: RotatingIpRoutePlanner) -> Self {
+        RoutePlanner::Rotating(route_planner)
+    }
+}
+
+impl From<NanoIpRoutePlanner> for RoutePlanner {
+    fn from(route_planner: NanoIpRoutePlanner) -> Self {
+        RoutePlanner::Nano(route_planner)
+    }
+}
+
+impl From<RotatingNanoIpRoutePlanner> for RoutePlanner {
+    fn from(route_planner: RotatingNanoIpRoutePlanner) -> Self {
+        RoutePlanner::RotatingNano(route_planner)
+    }
+}
+
+impl From<BalancingIpRoutePlanner> for RoutePlanner {
+    fn from(route_planner: BalancingIpRoutePlanner) -> Self {
+        RoutePlanner::Balancing(route_planner)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The kind of route planner.
+pub enum RoutePlannerKind {
+    /// IP address used is switched on ban. Recommended for IPv4 blocks or IPv6 blocks smaller than a /64.
+    Rotating,
+    /// IP address used is switched on clock update. Use with at least 1 /64 IPv6 block.
+    Nano,
+    /// IP address used is switched on clock update, rotates to a different /64 block on ban. Use with at least 2x /64 IPv6 blocks.
+    RotatingNano,
+    /// IP address used is selected at random per request. Recommended for larger IP blocks.
+    Balancing,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Route planner using a rotating IP address.
+pub struct RotatingIpRoutePlanner {
+    /// The ip block being used.
+    pub ip_block: IPBlock,
+    /// The failing addresses.
+    pub failing_addresses: Vec<FailingAddress>,
+    /// The number of rotations.
+    pub rotate_index: String,
+    /// The current offset in the block.
+    pub ip_index: String,
+    /// The current address being used.
+    pub current_address: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Route planner using a nano IP address.
+pub struct NanoIpRoutePlanner {
+    /// The ip block being used.
+    pub ip_block: IPBlock,
+    /// The failing addresses.
+    pub failing_addresses: Vec<FailingAddress>,
+    /// The current offset in the ip block.
+    pub current_address_index: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Route planner using a rotating nano IP address.
+pub struct RotatingNanoIpRoutePlanner {
+    /// The ip block being used.
+    pub ip_block: IPBlock,
+    /// The failing addresses.
+    pub failing_addresses: Vec<FailingAddress>,
+    /// The current offset in the ip block.
+    pub current_address_index: String,
+    /// The information in which /64 block ips are chosen. This number increases on each ban.
+    pub block_index: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// Route planner using a balancing IP address.
+pub struct BalancingIpRoutePlanner {
+    /// The ip block being used.
+    pub ip_block: IPBlock,
+    /// The failing addresses.
+    pub failing_addresses: Vec<FailingAddress>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -784,6 +1431,30 @@ pub enum IPBlock {
     #[serde(rename = "Inet6Address")]
     /// The ipv6 block type.
     Inet6(String),
+}
+
+impl IPBlock {
+    /// Get the inner value.
+    pub fn inner(&self) -> &str {
+        match self {
+            IPBlock::Inet4(inner) => inner,
+            IPBlock::Inet6(inner) => inner,
+        }
+    }
+
+    /// Convert the IP block into the inner value.
+    pub fn into_inner(self) -> String {
+        match self {
+            IPBlock::Inet4(inner) => inner,
+            IPBlock::Inet6(inner) => inner,
+        }
+    }
+}
+
+impl Into<String> for IPBlock {
+    fn into(self) -> String {
+        self.into_inner()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
