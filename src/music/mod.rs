@@ -7,6 +7,7 @@ mod player;
 use message::update_message;
 pub use player::*;
 use tokio::time::sleep;
+use tracing::{event, Level};
 
 use std::{
     error::Error as StdError,
@@ -23,7 +24,6 @@ use serenity::all::{
     VoiceState as SerenityVoiceState,
 };
 use songbird::{error::JoinError, Songbird};
-use tracing::{debug, info, warn};
 
 use crate::{
     lavalink::{
@@ -32,7 +32,6 @@ use crate::{
     },
     utils::constants::{
         HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
-        LAVALINK_RECONNECTION_DELAY,
     },
 };
 
@@ -68,15 +67,12 @@ impl PlayerManager {
         let players = Arc::new(DashMap::<GuildId, Player>::new());
 
         for i in 0..lavalink.nodes().len() {
-            info!("(music): connecting to Lavalink node {}", i);
+            event!(Level::DEBUG, node_id = i, "connecting to Lavalink...");
             if let Err(e) = lavalink.connect(i).await {
-                warn!(
-                    "(music): failed to connect to Lavalink node {}, retrying in {} seconds: {}",
-                    i, LAVALINK_RECONNECTION_DELAY, e
-                );
+                event!(Level::ERROR, node_id = i, error = ?e, "failed to connect to Lavalink");
                 reconnect_node(lavalink.clone(), i);
             }
-            info!("(music): connected to Lavalink node {}", i);
+            event!(Level::INFO, node_id = i, "connected to Lavalink");
         }
 
         let me = Self {
@@ -94,6 +90,21 @@ impl PlayerManager {
 
     /// Initialize a new player for the guild.
     pub async fn init(
+        &self,
+        guild_id: GuildId,
+        text_channel: ChannelId,
+        locale: &str,
+    ) -> Result<()> {
+        self.inner_init(guild_id, text_channel, locale).await?;
+
+        let mut player = self.players.get_mut(&guild_id).unwrap();
+        update_message(self, &mut player, guild_id, false).await;
+
+        Ok(())
+    }
+
+    /// Internal [Self::init] logic to be shared between methods.
+    async fn inner_init(
         &self,
         guild_id: GuildId,
         text_channel: ChannelId,
@@ -142,11 +153,6 @@ impl PlayerManager {
             },
         );
 
-        drop(call_lock);
-
-        let mut player = self.players.get_mut(&guild_id).unwrap();
-        update_message(self, &mut player, guild_id, false).await;
-
         Ok(())
     }
 
@@ -184,13 +190,12 @@ impl PlayerManager {
         text_channel: ChannelId,
         locale: &str,
     ) -> Result<PlayResult> {
-        let mut player = match self.players.get_mut(&guild_id) {
-            Some(player) => player,
-            None => {
-                self.init(guild_id, text_channel, locale).await?;
-                self.players.get_mut(&guild_id).unwrap()
-            }
-        };
+        if !self.contains_player(guild_id) {
+            self.inner_init(guild_id, text_channel, locale).await?;
+        }
+
+        let mut player = self.players.get_mut(&guild_id).unwrap();
+        update_message(self, &mut player, guild_id, true).await;
 
         let lavalink_node = &self.lavalink.nodes()[player.node_id];
 
@@ -210,13 +215,13 @@ impl PlayerManager {
                     })
                 }
             }
-            LoadResult::Playlist { tracks, info, .. } => {
+            LoadResult::Playlist(playlist) => {
                 self.inner_play(
                     guild_id,
                     requester,
-                    Some(info.selected_track as usize),
+                    Some(playlist.info.selected_track as usize),
                     &mut player,
-                    tracks,
+                    playlist.tracks,
                 )
                 .await
             }
@@ -231,7 +236,7 @@ impl PlayerManager {
                 truncated: false,
             }),
             LoadResult::Error(exception) => {
-                warn!("(music): failed to load track: {:?}", exception);
+                event!(Level::WARN, error = ?exception, "failed to load track");
 
                 Ok(PlayResult {
                     track: None,
@@ -295,9 +300,11 @@ impl PlayerManager {
             let mut index = match starting_index.overflowing_add(selected_track.unwrap_or(0)) {
                 (v, false) => v,
                 (_, true) => {
-                    debug!(
-                        "(player_manager): the selected track surpasses the usize limit: {}",
-                        selected_track.unwrap_or(0)
+                    event!(
+                        Level::WARN,
+                        starting_index = starting_index,
+                        selected_track = selected_track,
+                        "index overflowed"
                     );
                     starting_index
                 }
@@ -346,6 +353,12 @@ impl PlayerManager {
                 .await
                 .map_err(Error::from)?;
 
+            event!(
+                Level::DEBUG,
+                guild_id = ?guild_id,
+                "player started"
+            );
+
             Ok(true)
         } else {
             Ok(false)
@@ -355,8 +368,8 @@ impl PlayerManager {
     /// Handles the voice state update event, updating the player's connection.
     pub async fn update_voice_state(
         &self,
-        old_voice_state: Option<SerenityVoiceState>,
-        voice_state: SerenityVoiceState,
+        old_voice_state: Option<&SerenityVoiceState>,
+        voice_state: &SerenityVoiceState,
     ) -> Result<bool> {
         let guild_id = voice_state.guild_id.ok_or(Error::InvalidGuildId)?;
         let Some(mut player) = self.players.get_mut(&guild_id) else {
@@ -536,7 +549,7 @@ impl PlayerManager {
     pub async fn update_message(&self, guild_id: GuildId) {
         if let Some(mut player) = self.players.get_mut(&guild_id) {
             update_message(self, &mut player, guild_id, false).await;
-        };
+        }
     }
 }
 

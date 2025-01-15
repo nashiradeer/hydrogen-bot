@@ -21,7 +21,7 @@ impl ConfigParser {
     }
 
     /// Parses the configuration string into a list of [`Rest`] instances.
-    pub fn parse(&self, value: String) -> Vec<Rest> {
+    pub fn parse(&self, value: &str) -> Vec<Rest> {
         self.single_string_regex
             .captures_iter(&value)
             .filter_map(|cap| {

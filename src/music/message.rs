@@ -2,7 +2,7 @@ use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateMessage,
     EditMessage, GuildId, ReactionType,
 };
-use tracing::{debug, warn};
+use tracing::{event, Level};
 
 use crate::{
     i18n::{t, t_vars},
@@ -33,10 +33,7 @@ pub async fn update_message(
     guild_id: GuildId,
     thinking: bool,
 ) {
-    debug!(
-        "updating player message with thinking={}, player={:?}",
-        thinking, player
-    );
+    event!(Level::TRACE, thinking, player = ?player, "updating player message");
 
     let track = player.primary_queue.get(player.currrent_track);
     let state = PlayerState::detect_state(track, thinking);
@@ -69,7 +66,13 @@ pub async fn update_message(
             {
                 Ok(_) => return,
                 Err(e) => {
-                    warn!("cannot edit player message: {:?}", e);
+                    event!(
+                        Level::INFO,
+                        error = %e,
+                        player = ?player,
+                        guild_id = ?guild_id,
+                        "cannot edit player message, sending a new one"
+                    );
                     player.message_id = None;
                 }
             }
@@ -86,7 +89,13 @@ pub async fn update_message(
                 player.message_id = Some(message.id);
             }
             Err(e) => {
-                warn!("cannot send player message: {:?}", e);
+                event!(
+                    Level::INFO,
+                    error = %e,
+                    player = ?player,
+                    guild_id = ?guild_id,
+                    "cannot send player message"
+                );
                 player.text_channel = None;
             }
         }

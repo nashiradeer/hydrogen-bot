@@ -1,5 +1,7 @@
 //! Static and constant values used to configure Hydrogen.
 
+use std::time::Duration;
+
 /// The embed color used for success messages.
 pub const HYDROGEN_PRIMARY_COLOR: i32 = 0x5865f2;
 
@@ -29,3 +31,18 @@ pub static HYDROGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[allow(dead_code)]
 /// Hydrogen's project name.
 pub static HYDROGEN_NAME: &str = "Hydrogen";
+
+/// The time in milliseconds to consider a ready event as slow.
+pub const HYDROGEN_READY_THRESHOLD: Duration = Duration::from_millis(500);
+
+/// The time in milliseconds to consider a interaction create event as slow.
+pub const HYDROGEN_INTERACTION_CREATE_THRESHOLD: Duration = Duration::from_millis(2500);
+
+/// The time in milliseconds to consider a update voice state event as slow.
+pub const HYDROGEN_UPDATE_VOICE_STATE_THRESHOLD: Duration = Duration::from_millis(1000);
+
+/// The time in milliseconds to consider a update voice server event as slow.
+pub const HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD: Duration = Duration::from_millis(1500);
+
+/// The time in milliseconds to consider a lavalink event as slow.
+pub const HYDROGEN_LAVALINK_EVENT_THRESHOLD: Duration = Duration::from_millis(300);

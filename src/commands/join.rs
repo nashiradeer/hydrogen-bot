@@ -1,7 +1,7 @@
 //! '/join' command registration and execution.
 
 use serenity::{all::CommandInteraction, builder::CreateCommand, client::Context};
-use tracing::{error, info, warn};
+use tracing::{event, Level};
 
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
@@ -14,10 +14,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let guild_id = match interaction.guild_id {
         Some(v) => v,
         None => {
-            info!(
-                "(commands::join): the user {} is not in a guild",
-                interaction.user.id
-            );
+            event!(Level::WARN, "interaction.guild_id is None");
             return Response::new(
                 "join.embed_title",
                 "error.not_in_guild",
@@ -29,16 +26,13 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
-            error!("(commands::join): the manager is not initialized");
+            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
             return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
     if manager.contains_player(guild_id) {
-        info!(
-            "(commands::join): a player already exists in the guild {}",
-            guild_id
-        );
+        event!(Level::INFO, "player already exists");
         return Response::new(
             "join.embed_title",
             "error.player_exists",
@@ -52,10 +46,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             .get(&interaction.user.id)
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
-        info!(
-            "(commands::join): the user {} is not in a voice chat in the guild {}",
-            interaction.user.id, guild_id
-        );
+        event!(Level::INFO, "user voice state is None");
         return Response::new(
             "join.embed_title",
             "error.unknown_voice_state",
@@ -66,16 +57,13 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let voice_manager = match songbird::get(context).await {
         Some(v) => v,
         None => {
-            error!("(commands::join): cannot get the voice manager");
+            event!(Level::ERROR, "songbird::get() returned None");
             return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
         }
     };
 
     if let Err(e) = voice_manager.join_gateway(guild_id, voice_channel_id).await {
-        warn!(
-            "(commands::join): cannot connect to the voice channel in the guild {}: {}",
-            guild_id, e
-        );
+        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = %e, "cannot join the voice channel");
         return Response::new(
             "join.embed_title",
             "error.cant_connect",
@@ -95,10 +83,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         )
         .await
     {
-        error!(
-            "(commands::join): cannot initialize the player in the guild {}: {}",
-            guild_id, e
-        );
+        event!(Level::ERROR, error = %e, "cannot initialize the player");
         return Response::new("join.embed_title", "error.unknown", ResponseType::Error);
     }
 

@@ -1,7 +1,7 @@
 //! Controls the command execution flow.
 
 use serenity::all::{CommandInteraction, Context, CreateCommand};
-use tracing::error;
+use tracing::{event, Level};
 
 use crate::handler::Response;
 
@@ -15,10 +15,7 @@ pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Opt
         //"seek" => seek::execute(context, command).await,
         "play" => play::execute(context, command).await,
         _ => {
-            error!(
-                "(commands::execute): unknown command: {}",
-                command.data.name
-            );
+            event!(Level::ERROR, "unknown command");
             return None;
         }
     })

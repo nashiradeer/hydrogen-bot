@@ -9,7 +9,7 @@ use serenity::{
     http::{CacheHttp, Http},
 };
 use tokio::{spawn, time::sleep};
-use tracing::{debug, error, info, warn};
+use tracing::{event, instrument, Level, Span};
 
 use crate::{
     commands,
@@ -22,9 +22,10 @@ use crate::{
 pub type AutoRemoverKey = (ChannelId, UserId);
 
 /// Handles a command interaction.
+#[instrument(skip_all, name = "command_handler", fields(command_name = %command.data.name, user_id = %command.user.id, guild_id = ?command.guild_id.map(|v| v.get()), channel_id = %command.channel_id))]
 pub async fn handle_command(context: &Context, command: &CommandInteraction) {
     if let Err(e) = command.defer_ephemeral(&context.http).await {
-        error!("(handle_command): failed to defer interaction: {}", e);
+        event!(Level::ERROR, error = ?e, "failed to defer interaction");
         return;
     }
 
@@ -34,7 +35,11 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
         response.map(|response| response.into_edit_interaction_response(&command.locale))
     {
         if let Err(e) = command.edit_response(&context.http, message).await {
-            error!("(handle_command): cannot respond to the interaction: {}", e);
+            event!(
+                Level::ERROR,
+                error = ?e,
+                "cannot edit the response"
+            );
         }
     }
 }
@@ -86,14 +91,15 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
 pub async fn register_commands(http: impl AsRef<Http>) -> bool {
     let commands = commands::all_create_commands();
 
-    debug!(
-        "(register_command): registering {} commands...",
-        commands.len()
+    event!(
+        Level::DEBUG,
+        commands_count = commands.len(),
+        "registering commands..."
     );
 
     match Command::set_global_commands(http, commands.to_vec()).await {
         Ok(v) => {
-            info!("(register_command): registered {} commands", v.len());
+            event!(Level::INFO, commands_count = v.len(), "registered commands");
 
             let mut commands_id = HashMap::new();
 
@@ -101,14 +107,14 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
                 commands_id.insert(commands.name.clone(), commands.id);
             }
 
-            LOADED_COMMANDS
-                .set(commands_id)
-                .expect("cannot set the loaded commands");
+            if let Err(_) = LOADED_COMMANDS.set(commands_id) {
+                event!(Level::WARN, "cannot set the loaded commands");
+            }
 
             true
         }
         Err(e) => {
-            error!("(register_command): cannot register the commands: {}", e);
+            event!(Level::ERROR, error = ?e, "cannot register the commands");
 
             false
         }
@@ -116,9 +122,10 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
 }
 
 /// Removes the response after a certain time.
+#[instrument(name = "message_autoremover")]
 async fn autoremover(key: AutoRemoverKey) {
     sleep(Duration::from_secs(10)).await;
-    debug!("(autoremover): removing response {:?} from cache...", key);
+    event!(Level::DEBUG, message = ?key, "removing response from cache...");
     COMPONENTS_MESSAGES.remove(&key);
 }
 
