@@ -7,8 +7,6 @@ services:
       - ../..:/workspaces:cached
     depends_on:
       - lavalink
-    env_file:
-      - ../dev/.env
     command: sleep infinity
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4.0.8-alpine

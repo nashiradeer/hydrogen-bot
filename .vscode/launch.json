@@ -2,14 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "lldb-dap",
-      "request": "launch",
-      "name": "Debug (lldb-dap)",
-      "program": "${workspaceFolder}/target/debug/hydrogen",
-      "preLaunchTask": "rust: cargo build",
-      "cwd": "${workspaceRoot}"
-    },
-    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug (CodeLLDB)",
@@ -20,6 +12,7 @@
           "kind": "bin"
         }
       },
+      "envFile": "${workspaceFolder}/dev/.env",
       "cwd": "${workspaceFolder}"
     }
   ]

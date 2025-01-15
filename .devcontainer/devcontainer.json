@@ -17,8 +17,7 @@
         "tamasfe.even-better-toml",
         "fill-labs.dependi",
         "rust-lang.rust-analyzer",
-        "vadimcn.vscode-lldb",
-        "llvm-vs-code-extensions.lldb-dap"
+        "vadimcn.vscode-lldb"
       ]
     }
   },
