@@ -5,7 +5,7 @@
 - [x] Create a Dev Container. ([#7](https://github.com/nashiradeer/hydrogen-bot/issues/7))
 - [x] Fix play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 - [x] Recreate the Music Player message system.
-- [ ] Recreate logs messages.
+- [x] Recreate logs messages.
 - [ ] Reimplement loop_switch component.
 - [ ] Reimplement pause component.
 - [ ] Reimplement previous component.
@@ -13,7 +13,7 @@
 - [ ] Reimplement stop component.
 - [ ] Reimplement seek commmand.
 - [ ] Delete Player Message when there is no player in the guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
-- [ ] Update dependencies.
+- [x] Update dependencies.
 - [ ] Create a new icon for the bot.
 
 ## 0.0.1-alpha.13
