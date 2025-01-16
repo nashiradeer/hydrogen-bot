@@ -36,7 +36,7 @@ impl Lavalink {
     /// Connect to a Lavalink server.
     pub async fn connect_from(rest: Rest, user_id: &str) -> Result<Self> {
         Ok(Self::new(
-            connect(&rest.host(), &rest.host(), rest.tls(), user_id).await?,
+            connect(rest.host(), rest.password(), rest.tls(), user_id).await?,
             rest,
             user_id,
         ))
@@ -45,7 +45,14 @@ impl Lavalink {
     /// Reconnect to a Lavalink server, resuming a previous session.
     pub async fn resume_from(rest: Rest, user_id: &str, session_id: &str) -> Result<Self> {
         Ok(Self::new(
-            resume_session(&rest.host(), &rest.host(), rest.tls(), user_id, session_id).await?,
+            resume_session(
+                rest.host(),
+                rest.password(),
+                rest.tls(),
+                user_id,
+                session_id,
+            )
+            .await?,
             rest,
             user_id,
         ))
@@ -56,7 +63,7 @@ impl Lavalink {
     /// WARNING: This method locks the internal connection mutex.
     pub async fn connect(&self) -> Result<()> {
         *self.connection.lock().await =
-            connect(&self.host(), &self.host(), self.tls(), &self.user_id).await?;
+            connect(self.host(), self.password(), self.tls(), &self.user_id).await?;
 
         Ok(())
     }
@@ -66,8 +73,8 @@ impl Lavalink {
     /// WARNING: This method locks the internal connection mutex.
     pub async fn resume(&self) -> Result<()> {
         *self.connection.lock().await = resume_session(
-            &self.host(),
-            &self.host(),
+            self.host(),
+            self.password(),
             self.tls(),
             &self.user_id,
             self.session_id().as_ref().ok_or(Error::NoSessionId)?,
@@ -114,7 +121,7 @@ impl Lavalink {
         &self,
         guild_id: &str,
         player: &UpdatePlayer,
-        no_replace: Option<bool>,
+        no_replace: bool,
     ) -> Result<Player> {
         self.client
             .update_player(
@@ -153,19 +160,13 @@ impl Lavalink {
     ///
     /// WARNING: This method locks the internal connection mutex.
     pub async fn next(&self) -> Option<Result<Message>> {
-        let mut connection = self.connection.lock().await;
+        let data = parse_message(self.connection.lock().await.next().await?);
 
-        while let Some(msg) = connection.next().await {
-            let data = parse_message(msg);
-
-            if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
-                *self.session_id.write().unwrap() = Some(msg.session_id.clone());
-            }
-
-            return Some(data);
+        if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
+            *self.session_id.write().unwrap() = Some(msg.session_id.clone());
         }
 
-        None
+        Some(data)
     }
 
     /// Close the connection to the Lavalink server.

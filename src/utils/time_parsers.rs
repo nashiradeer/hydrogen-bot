@@ -5,14 +5,14 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 /// Regex for the `00s`, `00m`, and `00h` syntaxes.
-static TIME_SUFFIX_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+static _TIME_SUFFIX_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(([0-9]{1,3})[sS]?|([0-9]{1,3})[mM]|([0-9]{1,3})[hH])$")
         .expect("failed to compile the regex for time suffix parser")
 });
 
 /// Parses the `00s`, `00m`, and `00h` syntaxes.
-pub fn suffix_syntax(data: &str) -> Option<u32> {
-    let captures = TIME_SUFFIX_REGEX.captures(data)?;
+pub fn _suffix_syntax(data: &str) -> Option<u32> {
+    let captures = _TIME_SUFFIX_REGEX.captures(data)?;
 
     if let Some(seconds) = captures.get(2) {
         // `00s` syntax.
@@ -35,14 +35,14 @@ pub fn suffix_syntax(data: &str) -> Option<u32> {
 }
 
 /// Regex for the `00:00:00` and `00:00` syntaxes.
-static TIME_SEMICOLON_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+static _TIME_SEMICOLON_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^((([0-9]{1,3}):([0-5][0-9])|([0-9]{1,3})):([0-5][0-9]))$")
         .expect("failed to compile the regex for time semicolon parser")
 });
 
 /// Parses the `00:00:00` and `00:00` syntaxes.
-pub fn semicolon_syntax(data: &str) -> Option<u32> {
-    let captures = TIME_SEMICOLON_REGEX.captures(data)?;
+pub fn _semicolon_syntax(data: &str) -> Option<u32> {
+    let captures = _TIME_SEMICOLON_REGEX.captures(data)?;
 
     let hours_minutes = match captures.get(3) {
         Some(x) => {

@@ -3,13 +3,13 @@
 use std::{collections::HashMap, time::Duration};
 
 use serenity::{
-    all::{ChannelId, Command, CommandInteraction, ComponentInteraction, UserId},
+    all::{ChannelId, Command, CommandInteraction, UserId},
     builder::{CreateEmbed, CreateEmbedFooter, EditInteractionResponse},
     client::Context,
-    http::{CacheHttp, Http},
+    http::Http,
 };
-use tokio::{spawn, time::sleep};
-use tracing::{event, instrument, Level, Span};
+use tokio::time::sleep;
+use tracing::{event, instrument, Level};
 
 use crate::{
     commands,
@@ -44,8 +44,8 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
     }
 }
 
-/// Handles a component interaction.
-/* pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
+/* /// Handles a component interaction.
+pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
     if let Err(e) = component.defer_ephemeral(&context.http).await {
         error!("(handle_component): failed to defer interaction: {}", e);
         return;
@@ -107,7 +107,7 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
                 commands_id.insert(commands.name.clone(), commands.id);
             }
 
-            if let Err(_) = LOADED_COMMANDS.set(commands_id) {
+            if LOADED_COMMANDS.set(commands_id).is_err() {
                 event!(Level::WARN, "cannot set the loaded commands");
             }
 
@@ -192,7 +192,7 @@ pub enum ResponseValue<'a> {
     RawString(String),
 }
 
-impl<'a> ResponseValue<'a> {
+impl ResponseValue<'_> {
     /// Converts the [ResponseValue] into its value.
     pub fn into_value(self, lang: &str) -> String {
         match self {

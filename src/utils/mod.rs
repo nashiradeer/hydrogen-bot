@@ -4,7 +4,7 @@ pub mod constants;
 pub mod time_parsers;
 
 /// Converts a time in seconds to a string.
-pub fn time_to_string(seconds: i32) -> String {
+pub fn _time_to_string(seconds: i32) -> String {
     if seconds < 60 {
         return format!("00:{:02}", seconds);
     } else if seconds < 60 * 60 {
@@ -25,7 +25,7 @@ pub fn time_to_string(seconds: i32) -> String {
 }
 
 /// Creates a progress bar.
-pub fn progress_bar(current: i32, total: i32) -> String {
+pub fn _progress_bar(current: i32, total: i32) -> String {
     let item_total = 30usize;
     let item_count = (current as f32 / (total as f32 / item_total as f32)).round();
     let bar = "▓".repeat(item_count as usize);
