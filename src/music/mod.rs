@@ -207,7 +207,9 @@ impl PlayerManager {
         text_channel: ChannelId,
         locale: &str,
     ) -> Result<PlayResult> {
-        if !self.contains_player(guild_id) {
+        let initializing = !self.contains_player(guild_id);
+
+        if initializing {
             self.inner_init(guild_id, text_channel, locale).await?;
         }
 
@@ -215,12 +217,15 @@ impl PlayerManager {
             .get_player_state(guild_id)
             .ok_or(Error::InvalidGuildId)?;
 
-        let (channel_id, message_id) = update_message(self, guild_id, &player_state, true).await;
-        self.players.alter(&guild_id, |_, p| Player {
-            channel_id,
-            message_id,
-            ..p
-        });
+        if initializing {
+            let (channel_id, message_id) =
+                update_message(self, guild_id, &player_state, true).await;
+            self.players.alter(&guild_id, |_, p| Player {
+                channel_id,
+                message_id,
+                ..p
+            });
+        }
 
         let lavalink_node = &self.lavalink.nodes()[player_state.node_id];
 
