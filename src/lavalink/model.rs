@@ -1307,7 +1307,7 @@ pub struct UpdatePlayer {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The track position in milliseconds.
-    pub position: Option<i64>,
+    pub position: Option<u64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     ///The track end time in milliseconds (must be > 0). null resets this if it was set previously.
@@ -1338,7 +1338,7 @@ impl UpdatePlayer {
     }
 
     /// Set the position.
-    pub fn set_position(mut self, position: i64) -> Self {
+    pub fn set_position(mut self, position: u64) -> Self {
         self.position = Some(position);
         self
     }
