@@ -1,5 +1,7 @@
 //! Lavalink REST client.
 
+use std::time::Duration;
+
 use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use reqwest::Client;
 
@@ -31,6 +33,7 @@ impl Rest {
         let client = Client::builder()
             .user_agent(LAVALINK_USER_AGENT)
             .default_headers(HeaderMap::from_iter(headers))
+            .read_timeout(Duration::from_secs(10))
             .build()
             .map_err(Error::from)?;
 
@@ -76,7 +79,7 @@ impl Rest {
     /// Load a track from an identifier.
     pub async fn load_track(&self, identifier: &str) -> Result<LoadResult> {
         self.client
-            .get(&self.build_url(&format!(
+            .get(self.build_url(&format!(
                 "/v4/loadtracks?identifier={}&trace={}",
                 identifier, self.trace
             )))
@@ -92,7 +95,7 @@ impl Rest {
     /// Decode a base64 track.
     pub async fn decode_track(&self, encoded_track: &str) -> Result<Track> {
         self.client
-            .get(&self.build_url(&format!(
+            .get(self.build_url(&format!(
                 "/v4/decodetrack?encodedTrack={}&trace={}",
                 encoded_track, self.trace
             )))
@@ -108,7 +111,7 @@ impl Rest {
     /// Decode multiple base64 tracks.
     pub async fn decode_tracks(&self, encoded_tracks: &[&str]) -> Result<Vec<Track>> {
         self.client
-            .post(&self.build_url(&format!("/v4/decodetracks?trace={}", self.trace)))
+            .post(self.build_url(&format!("/v4/decodetracks?trace={}", self.trace)))
             .json(&encoded_tracks)
             .send()
             .await
@@ -122,7 +125,7 @@ impl Rest {
     /// Get all players in the session.
     pub async fn get_players(&self, session_id: &str) -> Result<Vec<Player>> {
         self.client
-            .get(&self.build_url(&format!(
+            .get(self.build_url(&format!(
                 "/v4/sessions/{}/players?trace={}",
                 session_id, self.trace
             )))
@@ -136,19 +139,26 @@ impl Rest {
     }
 
     /// Get the player in the session.
-    pub async fn get_player(&self, session_id: &str, guild_id: &str) -> Result<Player> {
-        self.client
-            .get(&self.build_url(&format!(
+    pub async fn get_player(&self, session_id: &str, guild_id: &str) -> Result<Option<Player>> {
+        let response = self
+            .client
+            .get(self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?trace={}",
                 session_id, guild_id, self.trace
             )))
             .send()
             .await
-            .map_err(Error::from)?
-            .json::<LavalinkResult<_>>()
-            .await
-            .map_err(Error::from)?
-            .into()
+            .map_err(Error::from)?;
+
+        if response.status() == StatusCode::NOT_FOUND {
+            Ok(None)
+        } else {
+            response
+                .json::<LavalinkResult<_>>()
+                .await
+                .map_err(Error::from)?
+                .into()
+        }
     }
 
     /// Update the player in the session.
@@ -156,18 +166,15 @@ impl Rest {
         &self,
         session_id: &str,
         guild_id: &str,
-        player: &UpdatePlayer,
-        no_replace: Option<bool>,
+        player: UpdatePlayer,
+        no_replace: bool,
     ) -> Result<Player> {
         self.client
-            .patch(&self.build_url(&format!(
+            .patch(self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?noReplace={}&trace={}",
-                session_id,
-                guild_id,
-                no_replace.unwrap_or(false),
-                self.trace
+                session_id, guild_id, no_replace, self.trace
             )))
-            .json(player)
+            .json(&player)
             .send()
             .await
             .map_err(Error::from)?
@@ -180,7 +187,7 @@ impl Rest {
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, session_id: &str, guild_id: &str) -> Result<()> {
         self.client
-            .delete(&self.build_url(&format!(
+            .delete(self.build_url(&format!(
                 "/v4/sessions/{}/players/{}?trace={}",
                 session_id, guild_id, self.trace
             )))
@@ -199,7 +206,7 @@ impl Rest {
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
         self.client
-            .patch(&self.build_url(&format!("/v4/sessions/{}?trace={}", session_id, self.trace)))
+            .patch(self.build_url(&format!("/v4/sessions/{}?trace={}", session_id, self.trace)))
             .json(session)
             .send()
             .await
@@ -213,7 +220,7 @@ impl Rest {
     /// Get information about the Lavalink server.
     pub async fn info(&self) -> Result<Info> {
         self.client
-            .get(&self.build_url(&format!("/v4/info?trace={}", self.trace)))
+            .get(self.build_url(&format!("/v4/info?trace={}", self.trace)))
             .send()
             .await
             .map_err(Error::from)?
@@ -226,7 +233,7 @@ impl Rest {
     /// Get the Lavalink version.
     pub async fn version(&self) -> Result<String> {
         self.client
-            .get(&self.build_url("/version"))
+            .get(self.build_url("/version"))
             .send()
             .await
             .map_err(Error::from)?
@@ -239,7 +246,7 @@ impl Rest {
     pub async fn routeplanner_status(&self) -> Result<Option<RoutePlanner>> {
         let response = self
             .client
-            .get(&self.build_url(&format!("/v4/routeplanner/status?trace={}", self.trace)))
+            .get(self.build_url(&format!("/v4/routeplanner/status?trace={}", self.trace)))
             .send()
             .await
             .map_err(Error::from)?;
@@ -259,7 +266,7 @@ impl Rest {
     /// Unmark a failed address in the Route Planner.
     pub async fn routeplanner_unmark(&self, address: &str) -> Result<()> {
         self.client
-            .post(&self.build_url(&format!(
+            .post(self.build_url(&format!(
                 "/v4/routeplanner/free/address?trace={}",
                 self.trace
             )))
@@ -277,7 +284,7 @@ impl Rest {
     /// Unmark all failed addresses in the Route Planner.
     pub async fn routeplanner_unmark_all(&self) -> Result<()> {
         self.client
-            .post(&self.build_url(&format!("/v4/routeplanner/free/all?trace={}", self.trace)))
+            .post(self.build_url(&format!("/v4/routeplanner/free/all?trace={}", self.trace)))
             .send()
             .await
             .map_err(Error::from)?
