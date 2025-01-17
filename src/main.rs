@@ -8,7 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use handler::{handle_command, register_commands, AutoRemoverKey};
+use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
 use lavalink::{cluster::Cluster, Rest};
 use music::PlayerManager;
 use parking_lot::Mutex;
@@ -30,7 +30,7 @@ use utils::constants::{
 };
 
 mod commands;
-//mod components;
+mod components;
 mod handler;
 mod i18n;
 pub mod lavalink;
@@ -209,10 +209,7 @@ impl EventHandler for HydrogenHandler {
 
         match interaction {
             Interaction::Command(command) => handle_command(&ctx, &command).await,
-            Interaction::Component(_component) => {
-
-                //handle_component(&ctx, &component).await;
-            }
+            Interaction::Component(component) => handle_component(&ctx, &component).await,
             _ => (),
         }
 

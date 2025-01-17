@@ -3,7 +3,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use serenity::{
-    all::{ChannelId, Command, CommandInteraction, UserId},
+    all::{ChannelId, Command, CommandInteraction, ComponentInteraction, UserId},
     builder::{CreateEmbed, CreateEmbedFooter, EditInteractionResponse},
     client::Context,
     http::Http,
@@ -12,7 +12,7 @@ use tokio::time::sleep;
 use tracing::{event, instrument, Level};
 
 use crate::{
-    commands,
+    commands, components,
     i18n::t,
     utils::constants::{HYDROGEN_ERROR_COLOR, HYDROGEN_LOGO_URL, HYDROGEN_PRIMARY_COLOR},
     COMPONENTS_MESSAGES, LOADED_COMMANDS,
@@ -44,10 +44,10 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
     }
 }
 
-/* /// Handles a component interaction.
+/// Handles a component interaction.
 pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
     if let Err(e) = component.defer_ephemeral(&context.http).await {
-        error!("(handle_component): failed to defer interaction: {}", e);
+        event!(Level::ERROR, error = ?e, "failed to defer interaction");
         return;
     }
 
@@ -60,7 +60,7 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
             Ok(v) => {
                 let auto_remover_key = (v.channel_id, component.user.id);
 
-                let auto_remover = spawn(async move {
+                let auto_remover = tokio::spawn(async move {
                     autoremover(auto_remover_key).await;
                 });
 
@@ -69,23 +69,17 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
                 {
                     auto_remover.abort();
 
-                    if let Err(e) = old_component.delete_response(context.http()).await {
-                        warn!(
-                            "(handle_component): cannot delete the message {:?}: {}",
-                            auto_remover_key, e
-                        );
+                    if let Err(e) = old_component.delete_response(&context.http).await {
+                        event!(Level::WARN, error = ?e, ?auto_remover_key, "cannot delete the message");
                     }
                 }
             }
             Err(e) => {
-                error!(
-                    "(handle_component): cannot respond to the interaction: {}",
-                    e
-                );
+                event!(Level::ERROR, error = ?e, "cannot edit the response");
             }
         }
     }
-} */
+}
 
 /// Registers the commands.
 pub async fn register_commands(http: impl AsRef<Http>) -> bool {
