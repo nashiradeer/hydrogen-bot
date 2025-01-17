@@ -101,46 +101,37 @@ impl Lavalink {
 
     /// Get all players in the session.
     pub async fn get_players(&self) -> Result<Vec<Player>> {
-        self.client
-            .get_players(self.session_id().as_ref().ok_or(Error::NoSessionId)?)
-            .await
+        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
+
+        self.client.get_players(&session_id).await
     }
 
     /// Get the player in the session.
-    pub async fn get_player(&self, guild_id: &str) -> Result<Player> {
-        self.client
-            .get_player(
-                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
-                guild_id,
-            )
-            .await
+    pub async fn get_player(&self, guild_id: &str) -> Result<Option<Player>> {
+        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
+
+        self.client.get_player(&session_id, guild_id).await
     }
 
     /// Update the player in the session.
     pub async fn update_player(
         &self,
         guild_id: &str,
-        player: &UpdatePlayer,
+        player: UpdatePlayer,
         no_replace: bool,
     ) -> Result<Player> {
+        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
+
         self.client
-            .update_player(
-                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
-                guild_id,
-                player,
-                no_replace,
-            )
+            .update_player(&session_id, guild_id, player, no_replace)
             .await
     }
 
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, guild_id: &str) -> Result<()> {
-        self.client
-            .destroy_player(
-                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
-                guild_id,
-            )
-            .await
+        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
+
+        self.client.destroy_player(&session_id, guild_id).await
     }
 
     /// Update the session.
@@ -148,12 +139,9 @@ impl Lavalink {
         &self,
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
-        self.client
-            .update_session(
-                self.session_id().as_ref().ok_or(Error::NoSessionId)?,
-                session,
-            )
-            .await
+        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
+
+        self.client.update_session(&session_id, session).await
     }
 
     /// Receive the next message from the Lavalink server.

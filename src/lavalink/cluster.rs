@@ -127,6 +127,11 @@ impl Cluster {
         self.index.load(Ordering::Relaxed)
     }
 
+    /// Get the session ID of a node.
+    pub async fn session_id(&self, index: usize) -> Option<String> {
+        self.session_id.read().await.get(&index).cloned()
+    }
+
     /// Get the current index and increment it for the next call.
     pub fn next_index(&self) -> usize {
         self.index
@@ -152,29 +157,16 @@ impl Cluster {
 
     /// Get all players in the session.
     pub async fn get_players(&self, index: usize) -> Result<Vec<Player>> {
-        self.nodes[index]
-            .get_players(
-                self.session_id
-                    .read()
-                    .await
-                    .get(&index)
-                    .ok_or(Error::NoSessionId)?,
-            )
-            .await
+        let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;
+
+        self.nodes[index].get_players(&session_id).await
     }
 
     /// Get the player in the session.
-    pub async fn get_player(&self, index: usize, guild_id: &str) -> Result<Player> {
-        self.nodes[index]
-            .get_player(
-                self.session_id
-                    .read()
-                    .await
-                    .get(&index)
-                    .ok_or(Error::NoSessionId)?,
-                guild_id,
-            )
-            .await
+    pub async fn get_player(&self, index: usize, guild_id: &str) -> Result<Option<Player>> {
+        let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;
+
+        self.nodes[index].get_player(&session_id, guild_id).await
     }
 
     /// Update the player in the session.
@@ -182,34 +174,22 @@ impl Cluster {
         &self,
         index: usize,
         guild_id: &str,
-        player: &UpdatePlayer,
-        no_replace: Option<bool>,
+        player: UpdatePlayer,
+        no_replace: bool,
     ) -> Result<Player> {
+        let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;
+
         self.nodes[index]
-            .update_player(
-                self.session_id
-                    .read()
-                    .await
-                    .get(&index)
-                    .ok_or(Error::NoSessionId)?,
-                guild_id,
-                player,
-                no_replace,
-            )
+            .update_player(&session_id, guild_id, player, no_replace)
             .await
     }
 
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, index: usize, guild_id: &str) -> Result<()> {
+        let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;
+
         self.nodes[index]
-            .destroy_player(
-                self.session_id
-                    .read()
-                    .await
-                    .get(&index)
-                    .ok_or(Error::NoSessionId)?,
-                guild_id,
-            )
+            .destroy_player(&session_id, guild_id)
             .await
     }
 
@@ -219,16 +199,9 @@ impl Cluster {
         index: usize,
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
-        self.nodes[index]
-            .update_session(
-                self.session_id
-                    .read()
-                    .await
-                    .get(&index)
-                    .ok_or(Error::NoSessionId)?,
-                session,
-            )
-            .await
+        let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;
+
+        self.nodes[index].update_session(&session_id, session).await
     }
 
     /// Receive a message from the nodes.
