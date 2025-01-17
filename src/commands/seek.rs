@@ -3,7 +3,7 @@
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
 };
-use tracing::{error, info};
+use tracing::{event, Level};
 
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
@@ -16,7 +16,7 @@ use crate::{
         time_parsers::{semicolon_syntax, suffix_syntax},
         time_to_string,
     },
-    MANAGER,
+    PLAYER_MANAGER,
 };
 
 /// Executes the `/seek` command.
@@ -24,10 +24,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let guild_id = match interaction.guild_id {
         Some(v) => v,
         None => {
-            info!(
-                "(commands::seek): the user {} is not in a guild",
-                interaction.user.id
-            );
+            event!(Level::WARN, "interaction.guild_id is None");
             return Response::new(
                 "seek.embed_title",
                 "error.not_in_guild",
@@ -36,10 +33,10 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
-            error!("(commands::seek): the manager is not initialized");
+            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
             return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -50,7 +47,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         .first()
         .and_then(|v| v.value.as_str())
     else {
-        error!("(commands::seek): cannot get the 'time' option");
+        event!(Level::WARN, "no time provided");
         return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
     };
 
@@ -60,10 +57,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             .get(&interaction.user.id)
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
-        info!(
-            "(commands::seek): the user {} is not in a voice chat in the guild {}",
-            interaction.user.id, guild_id
-        );
+        event!(Level::INFO, "user voice state is None");
         return Response::new(
             "seek.embed_title",
             "error.unknown_voice_state",
@@ -71,17 +65,14 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         );
     };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id).await {
-        if my_channel_id == voice_channel_id.into() {
+    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
+        if my_channel_id == voice_channel_id {
             let seek_time = match suffix_syntax(time) {
                 Some(v) => v,
                 None => match semicolon_syntax(time) {
                     Some(v) => v,
                     None => {
-                        info!(
-                            "(commands::seek): the user {} provided an invalid syntax: {}",
-                            interaction.user.id, time
-                        );
+                        event!(Level::INFO, syntax = time, "invalid syntax provided");
                         return Response::new(
                             "seek.embed_title",
                             "error.invalid_syntax",
@@ -91,24 +82,9 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 },
             };
 
-            let converted_seek_time = match seek_time.try_into() {
-                Ok(v) => v,
-                Err(e) => {
-                    error!(
-                        "(commands::seek): cannot convert the seek time to a i32: {}",
-                        e
-                    );
-                    return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
-                }
-            };
-
-            let seek_result = match manager.seek(guild_id, converted_seek_time).await {
+            let seek_result = match manager.seek(guild_id, seek_time).await {
                 Ok(Some(v)) => v,
                 Ok(None) => {
-                    info!(
-                        "(commands::seek): the player is empty in the guild {}",
-                        guild_id
-                    );
                     return Response::new(
                         "seek.embed_title",
                         "error.empty_queue",
@@ -116,10 +92,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                     );
                 }
                 Err(e) => {
-                    error!(
-                        "(commands::seek): cannot seek the player in the guild {}: {}",
-                        guild_id, e
-                    );
+                    event!(Level::ERROR, error = ?e, "cannot seek the player");
                     return Response::new("seek.embed_title", "error.unknown", ResponseType::Error);
                 }
             };
@@ -128,7 +101,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             let total_time = time_to_string(seek_result.total / 1000);
             let progress_bar = progress_bar(seek_result.position, seek_result.total);
 
-            let translation_message = if let Some(uri) = seek_result.track.uri {
+            let translation_message = if let Some(uri) = seek_result.track.url {
                 t_vars(
                     &interaction.locale,
                     "seek.seeking_url",
