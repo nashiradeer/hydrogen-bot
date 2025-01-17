@@ -156,7 +156,7 @@ fn generate_embed(
 
 /// Generates the title for the embed.
 fn generate_title(player: &PlayerState, track: Option<&Track>) -> Option<String> {
-    if player.has_destroy_handle {
+    if !player.has_destroy_handle {
         track.map(|track| format!("**{}**", track.title))
     } else {
         None
