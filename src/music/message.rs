@@ -12,15 +12,15 @@ use crate::{
 use super::{PlayerManager, PlayerState, Track};
 
 /// Whether to disable the previous button.
-const DISABLE_PREVIOUS: bool = true;
+const DISABLE_PREVIOUS: bool = false;
 /// Whether to disable the play/pause button.
-const DISABLE_PAUSE: bool = true;
+const DISABLE_PAUSE: bool = false;
 /// Whether to disable the skip button.
-const DISABLE_SKIP: bool = true;
+const DISABLE_SKIP: bool = false;
 /// Whether to disable the stop button.
-const DISABLE_STOP: bool = true;
+const DISABLE_STOP: bool = false;
 /// Whether to disable the loop button.
-const DISABLE_LOOP: bool = true;
+const DISABLE_LOOP: bool = false;
 /// Whether to disable the shuffle button.
 const DISABLE_SHUFFLE: bool = true;
 /// Whether to disable the queue button.
