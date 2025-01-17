@@ -16,7 +16,7 @@ pub enum Message {
     /// Dispatched when the node sends stats once per minute.
     Stats(Stats),
     /// Dispatched when player or voice events occur.
-    Event(Event),
+    Event(Box<Event>),
 }
 
 impl Message {
@@ -86,7 +86,7 @@ impl Message {
     /// Convert the message to event.
     pub fn to_event(self) -> Option<Event> {
         match self {
-            Message::Event(event) => Some(event),
+            Message::Event(event) => Some(*event),
             _ => None,
         }
     }
@@ -144,7 +144,7 @@ impl From<Stats> for Message {
 
 impl From<Event> for Message {
     fn from(event: Event) -> Self {
-        Self::Event(event)
+        Self::Event(Box::new(event))
     }
 }
 
@@ -248,7 +248,7 @@ pub struct FrameStats {
     /// The amount of frames that were nulled.
     pub nulled: u32,
     /// The difference between sent frames and the expected amount of frames.
-    pub deficit: u32,
+    pub deficit: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -587,10 +587,7 @@ pub enum TrackEndReason {
 impl TrackEndReason {
     /// Check if the next track should start.
     pub fn may_start_next(&self) -> bool {
-        match self {
-            Self::Finished | Self::LoadFailed => true,
-            _ => false,
-        }
+        matches!(self, Self::Finished | Self::LoadFailed)
     }
 }
 
@@ -652,9 +649,9 @@ pub enum LavalinkResult<T> {
     Err(Error),
 }
 
-impl<T> Into<Result<T, super::Error>> for LavalinkResult<T> {
-    fn into(self) -> Result<T, super::Error> {
-        match self {
+impl<T> From<LavalinkResult<T>> for Result<T, super::Error> {
+    fn from(result: LavalinkResult<T>) -> Self {
+        match result {
             LavalinkResult::Ok(value) => Ok(value),
             LavalinkResult::Err(err) => Err(err.into()),
         }
@@ -676,7 +673,7 @@ pub struct PlaylistInfo {
 /// Represents the result of a load operation.
 pub enum LoadResult {
     /// A track has been loaded.
-    Track(Track),
+    Track(Box<Track>),
     /// A playlist has been loaded.
     Playlist(LoadResultPlaylist),
     /// A search result has been loaded.
@@ -727,7 +724,7 @@ impl LoadResult {
     /// Convert the result to a track.
     pub fn to_track(self) -> Option<Track> {
         match self {
-            LoadResult::Track(track) => Some(track),
+            LoadResult::Track(track) => Some(*track),
             _ => None,
         }
     }
@@ -851,6 +848,17 @@ pub struct VoiceState {
     pub session_id: String,
 }
 
+impl VoiceState {
+    /// Create a new voice state.
+    pub fn new(token: &str, endpoint: &str, session_id: &str) -> Self {
+        Self {
+            token: token.to_owned(),
+            endpoint: endpoint.to_owned(),
+            session_id: session_id.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Configure the filters for the player.
@@ -900,6 +908,8 @@ pub struct Filters {
     pub plugin_filters: Option<HashMap<String, Value>>,
 }
 
+impl Filters {}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// There are 15 bands (0-14) that can be changed. "gain" is the multiplier for the given band. The default value is 0. Valid values range from -0.25 to 1.0, where -0.25 means the given band is completely muted, and 0.25 means it is doubled. Modifying the gain could also change the volume of the output.
@@ -910,7 +920,14 @@ pub struct Equalizer {
     pub gain: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Equalizer {
+    /// Create a new equalizer.
+    pub fn new(band: u8, gain: f32) -> Self {
+        Self { band, gain }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Uses equalization to eliminate part of a band, usually targeting vocals.
 pub struct Karaoke {
@@ -931,7 +948,43 @@ pub struct Karaoke {
     pub filter_width: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Karaoke {
+    /// Create a new karaoke.
+    pub fn new(level: f32, mono_level: f32, filter_band: f32, filter_width: f32) -> Self {
+        Self {
+            level: Some(level),
+            mono_level: Some(mono_level),
+            filter_band: Some(filter_band),
+            filter_width: Some(filter_width),
+        }
+    }
+
+    /// Set the level.
+    pub fn set_level(mut self, level: f32) -> Self {
+        self.level = Some(level);
+        self
+    }
+
+    /// Set the mono level.
+    pub fn set_mono_level(mut self, mono_level: f32) -> Self {
+        self.mono_level = Some(mono_level);
+        self
+    }
+
+    /// Set the filter band.
+    pub fn set_filter_band(mut self, filter_band: f32) -> Self {
+        self.filter_band = Some(filter_band);
+        self
+    }
+
+    /// Set the filter width.
+    pub fn set_filter_width(mut self, filter_width: f32) -> Self {
+        self.filter_width = Some(filter_width);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Changes the speed, pitch, and rate. All default to 1.0.
 pub struct Timescale {
@@ -948,7 +1001,36 @@ pub struct Timescale {
     pub rate: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Timescale {
+    /// Create a new timescale.
+    pub fn new(speed: f32, pitch: f32, rate: f32) -> Self {
+        Self {
+            speed: Some(speed),
+            pitch: Some(pitch),
+            rate: Some(rate),
+        }
+    }
+
+    /// Set the speed.
+    pub fn set_speed(mut self, speed: f32) -> Self {
+        self.speed = Some(speed);
+        self
+    }
+
+    /// Set the pitch.
+    pub fn set_pitch(mut self, pitch: f32) -> Self {
+        self.pitch = Some(pitch);
+        self
+    }
+
+    /// Set the rate.
+    pub fn set_rate(mut self, rate: f32) -> Self {
+        self.rate = Some(rate);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Uses amplification to create a shuddering effect, where the volume quickly oscillates. Demo: https://en.wikipedia.org/wiki/File:Fuse_Electronics_Tremolo_MK-III_Quick_Demo.ogv
 pub struct Tremolo {
@@ -961,7 +1043,29 @@ pub struct Tremolo {
     pub depth: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Tremolo {
+    /// Create a new tremolo.
+    pub fn new(frequency: f32, depth: f32) -> Self {
+        Self {
+            frequency: Some(frequency),
+            depth: Some(depth),
+        }
+    }
+
+    /// Set the frequency.
+    pub fn set_frequency(mut self, frequency: f32) -> Self {
+        self.frequency = Some(frequency);
+        self
+    }
+
+    /// Set the depth.
+    pub fn set_depth(mut self, depth: f32) -> Self {
+        self.depth = Some(depth);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Similar to tremolo. While tremolo oscillates the volume, vibrato oscillates the pitch.
 pub struct Vibrato {
@@ -974,7 +1078,29 @@ pub struct Vibrato {
     pub depth: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Vibrato {
+    /// Create a new vibrato.
+    pub fn new(frequency: f32, depth: f32) -> Self {
+        Self {
+            frequency: Some(frequency),
+            depth: Some(depth),
+        }
+    }
+
+    /// Set the frequency.
+    pub fn set_frequency(mut self, frequency: f32) -> Self {
+        self.frequency = Some(frequency);
+        self
+    }
+
+    /// Set the depth.
+    pub fn set_depth(mut self, depth: f32) -> Self {
+        self.depth = Some(depth);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Rotates the sound around the stereo channels/user headphones (aka Audio Panning). It can produce an effect similar to https://youtu.be/QB9EB8mTKcc (without the reverb).
 pub struct Rotation {
@@ -983,7 +1109,22 @@ pub struct Rotation {
     pub rotation_hz: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Rotation {
+    /// Create a new rotation.
+    pub fn new(rotation_hz: f32) -> Self {
+        Self {
+            rotation_hz: Some(rotation_hz),
+        }
+    }
+
+    /// Set the rotation hz.
+    pub fn set_rotation_hz(mut self, rotation_hz: f32) -> Self {
+        self.rotation_hz = Some(rotation_hz);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Distortion effect. It can generate some pretty unique audio effects.
 pub struct Distortion {
@@ -1020,7 +1161,57 @@ pub struct Distortion {
     pub scale: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Distortion {
+    /// Set the sin offset.
+    pub fn set_sin_offset(mut self, sin_offset: f32) -> Self {
+        self.sin_offset = Some(sin_offset);
+        self
+    }
+
+    /// Set the sin scale.
+    pub fn set_sin_scale(mut self, sin_scale: f32) -> Self {
+        self.sin_scale = Some(sin_scale);
+        self
+    }
+
+    /// Set the cos offset.
+    pub fn set_cos_offset(mut self, cos_offset: f32) -> Self {
+        self.cos_offset = Some(cos_offset);
+        self
+    }
+
+    /// Set the cos scale.
+    pub fn set_cos_scale(mut self, cos_scale: f32) -> Self {
+        self.cos_scale = Some(cos_scale);
+        self
+    }
+
+    /// Set the tan offset.
+    pub fn set_tan_offset(mut self, tan_offset: f32) -> Self {
+        self.tan_offset = Some(tan_offset);
+        self
+    }
+
+    /// Set the tan scale.
+    pub fn set_tan_scale(mut self, tan_scale: f32) -> Self {
+        self.tan_scale = Some(tan_scale);
+        self
+    }
+
+    /// Set the offset.
+    pub fn set_offset(mut self, offset: f32) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    /// Set the scale.
+    pub fn set_scale(mut self, scale: f32) -> Self {
+        self.scale = Some(scale);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Mixes both channels (left and right), with a configurable factor on how much each channel affects the other. With the defaults, both channels are kept independent of each other. Setting all factors to 0.5 means both channels get the same audio.
 pub struct ChannelMix {
@@ -1041,13 +1232,69 @@ pub struct ChannelMix {
     pub right_to_right: Option<f32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl ChannelMix {
+    /// Create a new channel mix.
+    pub fn new(
+        left_to_left: f32,
+        left_to_right: f32,
+        right_to_left: f32,
+        right_to_right: f32,
+    ) -> Self {
+        Self {
+            left_to_left: Some(left_to_left),
+            left_to_right: Some(left_to_right),
+            right_to_left: Some(right_to_left),
+            right_to_right: Some(right_to_right),
+        }
+    }
+
+    /// Set the left to left channel mix factor.
+    pub fn set_left_to_left(mut self, left_to_left: f32) -> Self {
+        self.left_to_left = Some(left_to_left);
+        self
+    }
+
+    /// Set the left to right channel mix factor.
+    pub fn set_left_to_right(mut self, left_to_right: f32) -> Self {
+        self.left_to_right = Some(left_to_right);
+        self
+    }
+
+    /// Set the right to left channel mix factor.
+    pub fn set_right_to_left(mut self, right_to_left: f32) -> Self {
+        self.right_to_left = Some(right_to_left);
+        self
+    }
+
+    /// Set the right to right channel mix factor.
+    pub fn set_right_to_right(mut self, right_to_right: f32) -> Self {
+        self.right_to_right = Some(right_to_right);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Higher frequencies get suppressed, while lower frequencies pass through this filter, thus the name low pass. Any smoothing values equal to or less than 1.0 will disable the filter.
 pub struct LowPass {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The smoothing factor. (1.0 < x)
     pub smoothing: Option<f32>,
+}
+
+impl LowPass {
+    /// Create a new low pass.
+    pub fn new(smoothing: f32) -> Self {
+        Self {
+            smoothing: Some(smoothing),
+        }
+    }
+
+    /// Set the smoothing factor.
+    pub fn set_smoothing(mut self, smoothing: f32) -> Self {
+        self.smoothing = Some(smoothing);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1083,11 +1330,61 @@ pub struct UpdatePlayer {
     pub voice: Option<VoiceState>,
 }
 
+impl UpdatePlayer {
+    /// Set the track.
+    pub fn set_track(mut self, track: UpdatePlayerTrack) -> Self {
+        self.track = Some(track);
+        self
+    }
+
+    /// Set the position.
+    pub fn set_position(mut self, position: i64) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    /// Set the end time.
+    pub fn set_end_time(mut self, end_time: u64) -> Self {
+        self.end_time = Some(Some(end_time));
+        self
+    }
+
+    /// Reset the end time.
+    pub fn reset_end_time(mut self) -> Self {
+        self.end_time = Some(None);
+        self
+    }
+
+    /// Set the volume.
+    pub fn set_volume(mut self, volume: u16) -> Self {
+        self.volume = Some(volume);
+        self
+    }
+
+    /// Set the paused.
+    pub fn set_paused(mut self, paused: bool) -> Self {
+        self.paused = Some(paused);
+        self
+    }
+
+    /// Set the filters.
+    pub fn set_filters(mut self, filters: Filters) -> Self {
+        self.filters = Some(filters);
+        self
+    }
+
+    /// Set the voice state.
+    pub fn set_voice(mut self, voice: VoiceState) -> Self {
+        self.voice = Some(voice);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Update the player's track.
 pub struct UpdatePlayerTrack {
-    /// The base64 encoded track to play. [Option::None] stops the current track.
+    /// The base64 encoded track to play. `Some(None)` stops the current track.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoded: Option<Option<String>>,
 
@@ -1096,8 +1393,37 @@ pub struct UpdatePlayerTrack {
     pub identifier: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    ///	Additional track data to be sent back in the [Track].
+    /// Additional track data to be sent back in the [Track].
     pub user_data: Option<HashMap<String, Value>>,
+}
+
+impl UpdatePlayerTrack {
+    /// Set the encoded track.
+    pub fn set_encoded(mut self, encoded: &str) -> Self {
+        self.encoded = Some(Some(encoded.to_owned()));
+        self.identifier = None;
+        self
+    }
+
+    /// Set the identifier.
+    pub fn set_identifier(mut self, identifier: &str) -> Self {
+        self.identifier = Some(identifier.to_owned());
+        self.encoded = None;
+        self
+    }
+
+    /// Set the stop player.
+    pub fn set_stop_player(mut self) -> Self {
+        self.encoded = Some(None);
+        self.identifier = None;
+        self
+    }
+
+    /// Set the user data.
+    pub fn set_user_data(mut self, user_data: HashMap<String, Value>) -> Self {
+        self.user_data = Some(user_data);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1111,6 +1437,28 @@ pub struct UpdateSessionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The timeout in seconds. (default is 60s)
     pub timeout: Option<u32>,
+}
+
+impl UpdateSessionRequest {
+    /// Create a new update session request.
+    pub fn new(resuming: bool, timeout: u32) -> Self {
+        Self {
+            resuming: Some(resuming),
+            timeout: Some(timeout),
+        }
+    }
+
+    /// Set whether resuming is enabled for this session or not.
+    pub fn set_resuming(mut self, resuming: bool) -> Self {
+        self.resuming = Some(resuming);
+        self
+    }
+
+    /// Set the timeout in seconds.
+    pub fn set_timeout(mut self, timeout: u32) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1435,25 +1783,20 @@ pub enum IPBlock {
 
 impl IPBlock {
     /// Get the inner value.
-    pub fn inner(&self) -> &str {
+    pub fn content(&self) -> &str {
         match self {
-            IPBlock::Inet4(inner) => inner,
-            IPBlock::Inet6(inner) => inner,
-        }
-    }
-
-    /// Convert the IP block into the inner value.
-    pub fn into_inner(self) -> String {
-        match self {
-            IPBlock::Inet4(inner) => inner,
-            IPBlock::Inet6(inner) => inner,
+            IPBlock::Inet4(content) => content,
+            IPBlock::Inet6(content) => content,
         }
     }
 }
 
-impl Into<String> for IPBlock {
-    fn into(self) -> String {
-        self.into_inner()
+impl From<IPBlock> for String {
+    fn from(ip_block: IPBlock) -> Self {
+        match ip_block {
+            IPBlock::Inet4(content) => content,
+            IPBlock::Inet6(content) => content,
+        }
     }
 }
 
