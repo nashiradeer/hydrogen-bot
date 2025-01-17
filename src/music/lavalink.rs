@@ -17,8 +17,12 @@ use super::PlayerManager;
 /// Handle the Lavalink events.
 pub fn handle_lavalink(player_manager: PlayerManager) {
     tokio::spawn(async move {
-        while let Some((node_id, message)) = player_manager.lavalink.recv().await {
-            process_message(player_manager.clone(), node_id, message).await;
+        while let Some((node_id, message)) = player_manager.clone().lavalink.recv().await {
+            let player_manager = player_manager.clone();
+
+            tokio::spawn(async move {
+                process_message(player_manager, node_id, message).await;
+            });
         }
     });
 }
@@ -53,8 +57,10 @@ async fn process_message(
 
         let mut should_remove = false;
 
+        let mut restart_player_list = Vec::new();
+
         for mut player in player_manager.players.iter_mut() {
-            let player_key = player.key().clone();
+            let player_key = *player.key();
             let player_value = player.value_mut();
 
             if player_value.node_id == node_id {
@@ -66,14 +72,8 @@ async fn process_message(
                         "migrating player..."
                     );
                     player_value.node_id = node_id;
-                    if let Err(e) = player_manager.start_player(player_key, player_value).await {
-                        event!(
-                            Level::ERROR,
-                            guild_id = %player_key,
-                            error = ?e,
-                            "failed to migrate player"
-                        );
-                    }
+
+                    restart_player_list.push(player_key);
                 } else {
                     event!(
                         Level::ERROR,
@@ -82,6 +82,17 @@ async fn process_message(
                     should_remove = true;
                     break;
                 }
+            }
+        }
+
+        for player_key in restart_player_list {
+            if let Err(e) = player_manager.start_player(player_key).await {
+                event!(
+                    Level::ERROR,
+                    guild_id = %player_key,
+                    error = ?e,
+                    "failed to restart player"
+                );
             }
         }
 
@@ -121,19 +132,13 @@ async fn process_data(message: &Message, player_manager: &PlayerManager) {
 async fn process_event(event: &Event, player_manager: &PlayerManager) {
     match event {
         Event::TrackStart(track) => {
-            if let Some(guild_id) = u64::from_str_radix(&track.guild_id, 10)
-                .ok()
-                .map(GuildId::new)
-            {
+            if let Some(guild_id) = track.guild_id.parse::<u64>().ok().map(GuildId::new) {
                 player_manager.update_message(guild_id).await;
             }
         }
         Event::TrackEnd(track) => {
             if track.reason.may_start_next() {
-                if let Some(guild_id) = u64::from_str_radix(&track.guild_id, 10)
-                    .ok()
-                    .map(GuildId::new)
-                {
+                if let Some(guild_id) = track.guild_id.parse::<u64>().ok().map(GuildId::new) {
                     if let Err(e) = player_manager.next_track(guild_id).await {
                         event!(
                             Level::ERROR,

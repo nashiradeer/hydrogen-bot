@@ -1,6 +1,6 @@
 use serenity::all::{
-    ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateMessage,
-    EditMessage, GuildId, ReactionType,
+    ButtonStyle, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor,
+    CreateMessage, EditMessage, GuildId, MessageId, ReactionType,
 };
 use tracing::{event, Level};
 
@@ -9,7 +9,7 @@ use crate::{
     utils::constants::{HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_PRIMARY_COLOR},
 };
 
-use super::{Player, PlayerManager, Track};
+use super::{PlayerManager, PlayerState, Track};
 
 /// Whether to disable the previous button.
 const DISABLE_PREVIOUS: bool = true;
@@ -29,14 +29,20 @@ const DISABLE_QUEUE: bool = true;
 /// Updates the player message.
 pub async fn update_message(
     manager: &PlayerManager,
-    player: &mut Player,
     guild_id: GuildId,
+    player: &PlayerState,
     thinking: bool,
-) {
-    event!(Level::TRACE, thinking, player = ?player, "updating player message");
+) -> (Option<ChannelId>, Option<MessageId>) {
+    event!(
+        Level::TRACE,
+        thinking = thinking,
+        player_state = ?player,
+        "updating player message"
+    );
 
-    let track = player.primary_queue.get(player.currrent_track);
-    let state = PlayerState::detect_state(track, thinking);
+    let track = player.track.as_ref();
+
+    let state = PlayerMessageState::detect_state(track, thinking);
 
     let title = generate_title(player, track);
     let description = generate_message(player, track);
@@ -64,7 +70,15 @@ pub async fn update_message(
                 )
                 .await
             {
-                Ok(_) => return,
+                Ok(msg) => {
+                    event!(
+                        Level::DEBUG,
+                        player = ?player,
+                        guild_id = ?guild_id,
+                        "player message updated"
+                    );
+                    return (Some(channel_id), Some(msg.id));
+                }
                 Err(e) => {
                     event!(
                         Level::INFO,
@@ -73,7 +87,6 @@ pub async fn update_message(
                         guild_id = ?guild_id,
                         "cannot edit player message, sending a new one"
                     );
-                    player.message_id = None;
                 }
             }
         }
@@ -86,7 +99,13 @@ pub async fn update_message(
             .await
         {
             Ok(message) => {
-                player.message_id = Some(message.id);
+                event!(
+                    Level::DEBUG,
+                    player = ?player,
+                    guild_id = ?guild_id,
+                    "player message sent"
+                );
+                return (Some(channel_id), Some(message.id));
             }
             Err(e) => {
                 event!(
@@ -96,10 +115,12 @@ pub async fn update_message(
                     guild_id = ?guild_id,
                     "cannot send player message"
                 );
-                player.text_channel = None;
+                return (None, None);
             }
         }
     }
+
+    (player.text_channel, player.message_id)
 }
 
 /// Generates the embed for the player message.
@@ -134,34 +155,36 @@ fn generate_embed(
 }
 
 /// Generates the title for the embed.
-fn generate_title(player: &Player, track: Option<&Track>) -> Option<String> {
-    match player.destroy_handle {
-        Some(_) => None,
-        None => track.map(|track| format!("**{}**", track.title)),
+fn generate_title(player: &PlayerState, track: Option<&Track>) -> Option<String> {
+    if player.has_destroy_handle {
+        track.map(|track| format!("**{}**", track.title))
+    } else {
+        None
     }
 }
 
 /// Generates the message description.
-fn generate_message(player: &Player, track: Option<&Track>) -> String {
-    if player.destroy_handle.is_some() {
-        return t_vars(
+fn generate_message(player: &PlayerState, track: Option<&Track>) -> String {
+    if player.has_destroy_handle {
+        t_vars(
             &player.locale,
             "player.timeout",
             [("time", HYDROGEN_EMPTY_CHAT_TIMEOUT.to_string())],
-        );
-    }
-
-    match track {
-        Some(track) => track.author.clone(),
-        None => t(&player.locale, "player.empty").to_owned(),
+        )
+    } else {
+        match track {
+            Some(track) => track.author.clone(),
+            None => t(&player.locale, "player.empty").to_owned(),
+        }
     }
 }
 
 /// Generates the URL for the embed.
-fn generate_url(player: &Player, track: Option<&Track>) -> Option<String> {
-    match player.destroy_handle {
-        Some(_) => None,
-        None => track.and_then(|track| track.url.clone()),
+fn generate_url(player: &PlayerState, track: Option<&Track>) -> Option<String> {
+    if player.has_destroy_handle {
+        track.and_then(|track| track.url.clone())
+    } else {
+        None
     }
 }
 
@@ -198,7 +221,7 @@ async fn generate_author(
 }
 
 /// Generates the components for the player message.
-fn generate_components(player: &Player, state: &PlayerState) -> Vec<CreateActionRow> {
+fn generate_components(player: &PlayerState, state: &PlayerMessageState) -> Vec<CreateActionRow> {
     let main_row_style = match state.is_thinking() {
         true => ButtonStyle::Secondary,
         false => ButtonStyle::Primary,
@@ -247,7 +270,7 @@ fn generate_components(player: &Player, state: &PlayerState) -> Vec<CreateAction
 
 /// Represents the state of the player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PlayerState {
+enum PlayerMessageState {
     /// The player is empty.
     Empty,
     /// The player is playing.
@@ -256,7 +279,7 @@ enum PlayerState {
     Thinking,
 }
 
-impl PlayerState {
+impl PlayerMessageState {
     /// Detects the state of the player.
     pub fn detect_state(track: Option<&Track>, thinking: bool) -> Self {
         if thinking {

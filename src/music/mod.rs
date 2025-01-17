@@ -40,6 +40,8 @@ use crate::{
 pub struct PlayerManager {
     /// The players.
     players: Arc<DashMap<GuildId, Player>>,
+    /// The connections to be used by the players.
+    connections: Arc<DashMap<GuildId, PlayerConnection>>,
     /// The voice manager.
     ///
     /// This [Arc] comes from outside the player manager.
@@ -65,6 +67,7 @@ impl PlayerManager {
         http: Arc<Http>,
     ) -> Self {
         let players = Arc::new(DashMap::<GuildId, Player>::new());
+        let connections = Arc::new(DashMap::<GuildId, PlayerConnection>::new());
 
         for i in 0..lavalink.nodes().len() {
             event!(Level::DEBUG, node_id = i, "connecting to Lavalink...");
@@ -81,6 +84,7 @@ impl PlayerManager {
             lavalink,
             cache,
             http,
+            connections,
         };
 
         handle_lavalink(me.clone());
@@ -95,10 +99,18 @@ impl PlayerManager {
         text_channel: ChannelId,
         locale: &str,
     ) -> Result<()> {
-        self.inner_init(guild_id, text_channel, locale).await?;
+        if !self.contains_player(guild_id) {
+            self.inner_init(guild_id, text_channel, locale).await?;
 
-        let mut player = self.players.get_mut(&guild_id).unwrap();
-        update_message(self, &mut player, guild_id, false).await;
+            if let Some(player) = self.get_player_state(guild_id) {
+                let (channel_id, message_id) = update_message(self, guild_id, &player, false).await;
+                self.players.alter(&guild_id, |_, p| Player {
+                    channel_id,
+                    message_id,
+                    ..p
+                });
+            }
+        }
 
         Ok(())
     }
@@ -110,48 +122,14 @@ impl PlayerManager {
         text_channel: ChannelId,
         locale: &str,
     ) -> Result<()> {
-        let call = self
-            .songbird
-            .get(guild_id)
-            .ok_or(Error::VoiceNotConnected)?;
-
-        let call_lock = call.lock().await;
-
-        let connection_info = call_lock
-            .current_connection()
-            .ok_or(Error::VoiceNotConnected)?;
-
-        let lavalink_node_id = self
+        let node_id = self
             .lavalink
             .search_connected_node()
             .await
             .ok_or(Error::NoAvailableLavalink)?;
 
-        self.players.insert(
-            guild_id,
-            Player {
-                currrent_track: 0,
-                destroy_handle: None,
-                endpoint: connection_info.endpoint.clone(),
-                locale: locale.to_owned(),
-                loop_mode: Default::default(),
-                node_id: lavalink_node_id,
-                message_id: None,
-                paused: false,
-                primary_queue: Vec::new(),
-                _secondary_queue: None,
-                text_channel: Some(text_channel),
-                voice_channel: ChannelId::new(
-                    connection_info
-                        .channel_id
-                        .ok_or(Error::VoiceNotConnected)?
-                        .0
-                        .into(),
-                ),
-                session_id: connection_info.session_id.clone(),
-                token: connection_info.token.clone(),
-            },
-        );
+        self.players
+            .insert(guild_id, Player::new_normal(node_id, locale, text_channel));
 
         Ok(())
     }
@@ -159,6 +137,32 @@ impl PlayerManager {
     /// Check if the player exists for the guild.
     pub fn contains_player(&self, guild_id: GuildId) -> bool {
         self.players.contains_key(&guild_id)
+    }
+
+    /// Check if the connection exists for the guild.
+    pub fn contains_connection(&self, guild_id: GuildId) -> bool {
+        self.connections.contains_key(&guild_id)
+    }
+
+    /// Check if the connection is ready for the guild.
+    pub fn connection_ready(&self, guild_id: GuildId) -> bool {
+        self.connections
+            .get(&guild_id)
+            .is_some_and(|c| c.is_ready())
+    }
+
+    /// Get the player state for the guild.
+    pub fn get_player_state(&self, guild_id: GuildId) -> Option<PlayerState> {
+        self.players.view(&guild_id, |_, p| p.into())
+    }
+
+    /// Get the current track playing in a player.
+    pub fn get_current_track(&self, guild_id: GuildId) -> Option<Track> {
+        self.players
+            .view(&guild_id, |_, p| {
+                p.primary_queue.get(p.currrent_track).cloned()
+            })
+            .flatten()
     }
 
     /// Search for the music using multiple prefixes.
@@ -194,17 +198,25 @@ impl PlayerManager {
             self.inner_init(guild_id, text_channel, locale).await?;
         }
 
-        let mut player = self.players.get_mut(&guild_id).unwrap();
-        update_message(self, &mut player, guild_id, true).await;
+        let player_state = self
+            .get_player_state(guild_id)
+            .ok_or(Error::InvalidGuildId)?;
 
-        let lavalink_node = &self.lavalink.nodes()[player.node_id];
+        let (channel_id, message_id) = update_message(self, guild_id, &player_state, true).await;
+        self.players.alter(&guild_id, |_, p| Player {
+            channel_id,
+            message_id,
+            ..p
+        });
+
+        let lavalink_node = &self.lavalink.nodes()[player_state.node_id];
 
         let songs = self.search(lavalink_node, music).await?;
 
         match songs {
             LoadResult::Search(tracks) => {
                 if let Some(music) = tracks.into_iter().nth(0) {
-                    self.inner_play(guild_id, requester, None, &mut player, vec![music])
+                    self.inner_play(guild_id, requester, None, vec![music])
                         .await
                 } else {
                     Ok(PlayResult {
@@ -219,14 +231,13 @@ impl PlayerManager {
                 self.inner_play(
                     guild_id,
                     requester,
-                    Some(playlist.info.selected_track as usize),
-                    &mut player,
+                    Some(playlist.info.selected_track),
                     playlist.tracks,
                 )
                 .await
             }
             LoadResult::Track(music) => {
-                self.inner_play(guild_id, requester, None, &mut player, vec![music])
+                self.inner_play(guild_id, requester, None, vec![*music])
                     .await
             }
             LoadResult::Empty => Ok(PlayResult {
@@ -253,34 +264,61 @@ impl PlayerManager {
         &self,
         guild_id: GuildId,
         requester: UserId,
-        selected_track: Option<usize>,
-        player: &mut Player,
-        tracks: Vec<LavalinkTrack>,
+        selected_track: Option<i32>,
+        raw_tracks: Vec<LavalinkTrack>,
     ) -> Result<PlayResult> {
-        let mut truncated = false;
+        let raw_tracks_size = raw_tracks.len();
 
-        let starting_index = player.primary_queue.len();
+        let original_queue_size = self
+            .players
+            .view(&guild_id, |_, p| p.primary_queue.len())
+            .unwrap_or(0);
 
-        for music in tracks {
-            if player.primary_queue.len() < HYDROGEN_QUEUE_LIMIT {
-                let mut track = Track::from(music);
+        let available_size = HYDROGEN_QUEUE_LIMIT - original_queue_size;
+
+        let tracks = raw_tracks
+            .into_iter()
+            .take(available_size)
+            .map(|t| {
+                let mut track = Track::from(t);
                 track.requester = requester;
 
-                player.primary_queue.push(track);
-            } else {
-                truncated = true;
-                break;
-            }
-        }
+                track
+            })
+            .collect::<Vec<_>>();
+
+        let tracks_size = tracks.len();
+
+        event!(
+            Level::DEBUG,
+            original_queue_size = original_queue_size,
+            available_size = available_size,
+            raw_tracks_size = raw_tracks_size,
+            tracks_size = tracks_size,
+            "inserting tracks into the player"
+        );
+
+        let truncated = tracks_size < raw_tracks_size;
+
+        let mut player = self
+            .players
+            .get_mut(&guild_id)
+            .ok_or(Error::InvalidGuildId)?;
+
+        player.primary_queue.extend(tracks);
+
+        let player_state = PlayerState::from(player.value());
+
+        drop(player);
 
         let mut playing = false;
 
         let lavalink_not_playing = match self
             .lavalink
-            .get_player(player.node_id, &guild_id.to_string())
+            .get_player(player_state.node_id, &guild_id.to_string())
             .await
         {
-            Ok(v) => v.track.is_none(),
+            Ok(v) => v.map_or(true, |p| p.track.is_none()),
             Err(e) => {
                 if let LavalinkError::Lavalink(ref er) = e {
                     if er.status != 404 {
@@ -294,62 +332,80 @@ impl PlayerManager {
             }
         };
 
-        let mut this_play_track = player.primary_queue.get(starting_index).cloned();
+        let mut this_play_track = player_state.track.clone();
 
         if lavalink_not_playing {
-            let mut index = match starting_index.overflowing_add(selected_track.unwrap_or(0)) {
-                (v, false) => v,
-                (_, true) => {
-                    event!(
-                        Level::WARN,
-                        starting_index = starting_index,
-                        selected_track = selected_track,
-                        "index overflowed"
-                    );
-                    starting_index
-                }
-            };
+            let mut index =
+                match original_queue_size.overflowing_add(selected_track.unwrap_or(0) as usize) {
+                    (v, false) => v,
+                    (_, true) => {
+                        event!(
+                            Level::WARN,
+                            starting_index = original_queue_size,
+                            selected_track = selected_track,
+                            "index overflowed"
+                        );
+                        original_queue_size
+                    }
+                };
+
+            let mut player = self
+                .players
+                .get_mut(&guild_id)
+                .ok_or(Error::InvalidGuildId)?;
 
             if index >= player.primary_queue.len() {
-                index = starting_index;
+                index = original_queue_size;
             }
 
             player.currrent_track = index;
             player.paused = false;
 
-            playing = self.start_player(guild_id, &player).await?;
+            drop(player);
+
+            playing = self.start_player(guild_id).await?;
+
             if playing {
-                this_play_track = player.primary_queue.get(index).cloned();
+                this_play_track = self.get_current_track(guild_id);
             }
         }
 
         Ok(PlayResult {
             track: this_play_track,
-            count: player.primary_queue.len() - starting_index,
+            count: tracks_size,
             playing,
             truncated,
         })
     }
 
     /// Starts the player, requesting the Lavalink node to play the music.
-    async fn start_player(&self, guild_id: GuildId, player: &Player) -> Result<bool> {
-        if let Some(music) = player.primary_queue.get(player.currrent_track) {
+    async fn start_player(&self, guild_id: GuildId) -> Result<bool> {
+        let player_state = self
+            .players
+            .view(&guild_id, |_, p| {
+                p.primary_queue
+                    .get(p.currrent_track)
+                    .map(|t| (t.track.clone(), p.paused, p.node_id))
+            })
+            .flatten();
+
+        if let Some((song, paused, node_id)) = player_state {
+            let voice_state = self
+                .connections
+                .view(&guild_id, |_, c| {
+                    TryInto::<VoiceState>::try_into(c.clone()).ok()
+                })
+                .flatten();
+
             let update_player = UpdatePlayer {
-                track: Some(UpdatePlayerTrack {
-                    encoded: Some(Some(music.track.clone())),
-                    ..Default::default()
-                }),
-                voice: Some(VoiceState {
-                    endpoint: player.endpoint.clone(),
-                    session_id: player.session_id.clone(),
-                    token: player.token.clone(),
-                }),
-                paused: Some(player.paused),
+                voice: voice_state,
                 ..Default::default()
-            };
+            }
+            .set_track(UpdatePlayerTrack::default().set_encoded(&song))
+            .set_paused(paused);
 
             self.lavalink
-                .update_player(player.node_id, &guild_id.to_string(), &update_player, None)
+                .update_player(node_id, &guild_id.to_string(), update_player, false)
                 .await
                 .map_err(Error::from)?;
 
@@ -368,51 +424,106 @@ impl PlayerManager {
     /// Handles the voice state update event, updating the player's connection.
     pub async fn update_voice_state(
         &self,
-        old_voice_state: Option<&SerenityVoiceState>,
+        _: Option<&SerenityVoiceState>,
         voice_state: &SerenityVoiceState,
     ) -> Result<bool> {
         let guild_id = voice_state.guild_id.ok_or(Error::InvalidGuildId)?;
-        let Some(mut player) = self.players.get_mut(&guild_id) else {
-            return Ok(false);
-        };
 
-        if old_voice_state.is_some() && voice_state.user_id == self.cache.current_user().id {
+        let player_state = self.get_player_state(guild_id);
+
+        if voice_state.user_id == self.cache.current_user().id {
             if let Some(channel_id) = voice_state.channel_id {
-                player.voice_channel = channel_id;
-                player.session_id = voice_state.session_id.clone();
+                if !self.contains_connection(guild_id) {
+                    self.connections.insert(
+                        guild_id,
+                        PlayerConnection::default()
+                            .set_session_id(&voice_state.session_id)
+                            .set_channel_id(channel_id.into()),
+                    );
+                } else {
+                    self.connections.alter(&guild_id, |_k, v| {
+                        v.set_session_id(&voice_state.session_id)
+                            .set_channel_id(channel_id.into())
+                    });
+                }
+
+                if let Some(ref player_state) = player_state {
+                    let voice = self
+                        .connections
+                        .view(&guild_id, |_, c| c.clone().try_into().ok())
+                        .flatten();
+
+                    let update_player = UpdatePlayer {
+                        voice,
+                        ..Default::default()
+                    };
+
+                    self.lavalink
+                        .update_player(
+                            player_state.node_id,
+                            &guild_id.to_string(),
+                            update_player,
+                            true,
+                        )
+                        .await?;
+                }
             } else {
-                drop(player);
                 self.destroy(guild_id).await?;
                 return Ok(true);
             }
         }
 
-        let channel = self
-            .cache
-            .guild(guild_id)
-            .ok_or(Error::GuildChannelNotFound)?
-            .channels
-            .get(&ChannelId::new(player.voice_channel.into()))
-            .ok_or(Error::GuildChannelNotFound)?
-            .clone();
+        let channel_id = self
+            .connections
+            .view(&guild_id, |_, v| v.serenity_channel_id())
+            .flatten();
 
-        if channel.kind == ChannelType::Voice || channel.kind == ChannelType::Stage {
-            let members_count = channel
-                .members(self.cache.clone())
-                .map_err(Error::from)?
-                .len();
+        if let Some(channel_id) = channel_id {
+            let member_count = {
+                let cache_ref = self
+                    .cache
+                    .guild(guild_id)
+                    .ok_or(Error::GuildChannelNotFound)?;
 
-            if members_count <= 1 {
-                self.inner_timed_destroy(
-                    guild_id,
-                    &mut player,
-                    Duration::from_secs(HYDROGEN_EMPTY_CHAT_TIMEOUT),
-                );
+                let channel = cache_ref
+                    .channels
+                    .get(&channel_id)
+                    .ok_or(Error::GuildChannelNotFound)?;
 
-                update_message(self, &mut player, guild_id, true).await;
-            } else {
-                self.cancel_destroy(&mut player).await;
-                update_message(self, &mut player, guild_id, false).await;
+                if channel.kind == ChannelType::Voice || channel.kind == ChannelType::Stage {
+                    let members_len = channel
+                        .members(self.cache.as_ref())
+                        .map_err(Error::from)?
+                        .len();
+
+                    Some(members_len)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(members_count) = member_count {
+                let thinking = if members_count <= 1 {
+                    self.timed_destroy(guild_id, Duration::from_secs(HYDROGEN_EMPTY_CHAT_TIMEOUT))
+                        .await;
+
+                    true
+                } else {
+                    self.cancel_destroy(guild_id);
+
+                    false
+                };
+
+                if let Some(player_state) = player_state {
+                    let (channel_id, message_id) =
+                        update_message(self, guild_id, &player_state, thinking).await;
+
+                    self.players.alter(&guild_id, |_, p| Player {
+                        channel_id,
+                        message_id,
+                        ..p
+                    });
+                }
             }
         }
 
@@ -423,29 +534,44 @@ impl PlayerManager {
     pub async fn update_voice_server(&self, voice_server: VoiceServerUpdateEvent) -> Result<bool> {
         let guild_id = voice_server.guild_id.ok_or(Error::InvalidGuildId)?;
 
-        let Some(mut player) = self.players.get_mut(&guild_id) else {
-            return Ok(false);
-        };
+        if !self.contains_connection(guild_id) {
+            let mut player_connection = PlayerConnection::default().set_token(&voice_server.token);
 
-        player.token = voice_server.token;
+            player_connection.endpoint = voice_server.endpoint;
 
-        if let Some(endpoint) = voice_server.endpoint {
-            player.endpoint = endpoint;
+            self.connections.insert(guild_id, player_connection);
+        } else {
+            self.connections.alter(&guild_id, |_k, v| PlayerConnection {
+                token: Some(voice_server.token.clone()),
+                endpoint: voice_server.endpoint,
+                ..v
+            });
         }
 
-        let update_player = UpdatePlayer {
-            voice: Some(VoiceState {
-                endpoint: player.endpoint.clone(),
-                session_id: player.session_id.clone(),
-                token: player.token.clone(),
-            }),
-            ..Default::default()
-        };
+        if self.contains_player(guild_id) {
+            let player_state = self.get_player_state(guild_id);
 
-        self.lavalink
-            .update_player(player.node_id, &guild_id.to_string(), &update_player, None)
-            .await
-            .map_err(Error::from)?;
+            if let Some(player_state) = player_state {
+                let voice = self
+                    .connections
+                    .view(&guild_id, |_, c| c.clone().try_into().ok())
+                    .flatten();
+
+                let update_player = UpdatePlayer {
+                    voice,
+                    ..Default::default()
+                };
+
+                self.lavalink
+                    .update_player(
+                        player_state.node_id,
+                        &guild_id.to_string(),
+                        update_player,
+                        true,
+                    )
+                    .await?;
+            }
+        }
 
         Ok(true)
     }
@@ -463,7 +589,7 @@ impl PlayerManager {
             .await
             .map_err(Error::from)?;
 
-        if let Some((message_id, text_channel)) = player.message_id.zip(player.text_channel) {
+        if let Some((message_id, text_channel)) = player.message_id.zip(player.channel_id) {
             self.http
                 .delete_message(
                     text_channel,
@@ -483,28 +609,29 @@ impl PlayerManager {
 
     /// Destroy the player after a certain duration.
     pub async fn timed_destroy(&self, guild_id: GuildId, duration: Duration) {
-        if let Some(mut player) = self.players.get_mut(&guild_id) {
-            self.inner_timed_destroy(guild_id, &mut player, duration);
-        }
-    }
+        self.players.alter(&guild_id, |_, mut player| {
+            if player.destroy_handle.is_none() {
+                let self_clone = self.clone();
 
-    /// Internal [Self::timed_destroy] logic to be shared between methods.
-    fn inner_timed_destroy(&self, guild_id: GuildId, player: &mut Player, duration: Duration) {
-        if player.destroy_handle.is_none() {
-            let self_clone = self.clone();
+                player.destroy_handle = Some(tokio::spawn(async move {
+                    sleep(duration).await;
+                    _ = self_clone.destroy(guild_id).await;
+                }));
+            }
 
-            player.destroy_handle = Some(tokio::spawn(async move {
-                sleep(duration).await;
-                _ = self_clone.destroy(guild_id).await;
-            }));
-        }
+            player
+        });
     }
 
     /// Cancel the destroy task for the player.
-    async fn cancel_destroy(&self, player: &mut Player) {
-        if let Some(handle) = player.destroy_handle.take() {
-            handle.abort();
-        }
+    fn cancel_destroy(&self, guild_id: GuildId) {
+        self.players.alter(&guild_id, |_, mut player| {
+            if let Some(handle) = player.destroy_handle.take() {
+                handle.abort();
+            }
+
+            player
+        });
     }
 
     /// Uses the player's loop mode to determine the next track to play.
@@ -516,7 +643,7 @@ impl PlayerManager {
         let (new_index, should_pause) = match player.loop_mode {
             LoopMode::None => {
                 if player.currrent_track + 1 >= player.primary_queue.len() {
-                    (0, true)
+                    (player.primary_queue.len() - 1, true)
                 } else {
                     (player.currrent_track + 1, false)
                 }
@@ -528,7 +655,7 @@ impl PlayerManager {
             ),
             LoopMode::Autopause => {
                 if player.currrent_track + 1 >= player.primary_queue.len() {
-                    (0, true)
+                    (player.primary_queue.len() - 1, true)
                 } else {
                     (player.currrent_track + 1, false)
                 }
@@ -538,17 +665,25 @@ impl PlayerManager {
         player.currrent_track = new_index;
         player.paused = should_pause;
 
-        self.start_player(guild_id, &player).await?;
+        drop(player);
 
-        update_message(self, &mut player, guild_id, false).await;
+        self.start_player(guild_id).await?;
 
         Ok(())
     }
 
     /// Update the player message.
     pub async fn update_message(&self, guild_id: GuildId) {
-        if let Some(mut player) = self.players.get_mut(&guild_id) {
-            update_message(self, &mut player, guild_id, false).await;
+        let player_state = self.get_player_state(guild_id);
+        if let Some(player_state) = player_state {
+            let (channel_id, message_id) =
+                update_message(self, guild_id, &player_state, false).await;
+
+            self.players.alter(&guild_id, |_, p| Player {
+                channel_id,
+                message_id,
+                ..p
+            });
         }
     }
 }
@@ -569,8 +704,6 @@ pub type Result<T> = StdResult<T, Error>;
 #[derive(Debug)]
 /// Errors that can occur when using the player manager.
 pub enum Error {
-    /// There's no voice connection for the guild in the voice manager.
-    VoiceNotConnected,
     /// There's no available Lavalink node.
     NoAvailableLavalink,
     /// Error from the Lavalink node.
@@ -591,10 +724,6 @@ impl Display for Error {
             Self::Lavalink(e) => write!(f, "Lavalink error: {}", e),
             Self::Join(e) => write!(f, "Join error: {}", e),
             Self::Serenity(e) => write!(f, "Serenity error: {}", e),
-            Self::VoiceNotConnected => write!(
-                f,
-                "There's no voice connection for the guild in the voice manager"
-            ),
             Self::NoAvailableLavalink => write!(f, "There's no available Lavalink node"),
             Self::InvalidGuildId => write!(f, "Invalid guild ID"),
             Self::GuildChannelNotFound => write!(f, "Guild channel was not found"),
