@@ -6,13 +6,12 @@
 - [x] Fix play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 - [x] Recreate the Music Player message system.
 - [x] Recreate logs messages.
-- [ ] Reimplement loop_switch component.
-- [ ] Reimplement pause component.
-- [ ] Reimplement previous component.
-- [ ] Reimplement skip component.
-- [ ] Reimplement stop component.
-- [ ] Reimplement seek commmand.
-- [ ] Delete Player Message when there is no player in the guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
+- [x] Reimplement loop_switch component.
+- [x] Reimplement pause component.
+- [x] Reimplement previous component.
+- [x] Reimplement skip component.
+- [x] Reimplement stop component.
+- [x] Reimplement seek commmand.
 - [x] Update dependencies.
 - [ ] Create a new icon for the bot.
 
@@ -20,6 +19,7 @@
 
 - [ ] Migrate to `dynfmt` crate instead of a lot of `String::replace`.
 - [ ] Migrate to responses using plain text instead of embeds.
+- [ ] Delete Player Message when there is no player in the guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
 - [ ] Rework seek to show current time and total time when no arguments are provided.
 - [ ] Rename seek to time.
 - [ ] Rework join to have templates for the Music Player.
@@ -31,7 +31,7 @@
 - [ ] Create the shuffle component.
 - [ ] Create the about command.
 - [ ] Create the donate command.
-- [ ] Create the report command.
+- [ ] Create the report command using a webhook.
 - [ ] Create the invite command.
 - [ ] Create a command to set Music Player language.
 - [ ] Update dependencies. (if needed)
@@ -62,6 +62,11 @@
 ## 0.0.1-alpha.17
 
 - [ ] Implement the PlayTogether queue system.
+- [ ] Update dependencies. (if needed)
+
+## 0.0.1-alpha.18
+
+- [ ] Send warns to Discord through a webhook.
 - [ ] Update dependencies. (if needed)
 
 ## 0.0.1-beta.1
