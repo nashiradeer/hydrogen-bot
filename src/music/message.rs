@@ -47,7 +47,7 @@ pub async fn update_message(
     let title = generate_title(player, track);
     let description = generate_message(player, track);
     let url = generate_url(player, track);
-    let author = generate_author(manager, track, guild_id).await;
+    let author = generate_author(manager, player, guild_id).await;
     let components = generate_components(player, &state);
 
     let embed = generate_embed(
@@ -191,10 +191,14 @@ fn generate_url(player: &PlayerState, track: Option<&Track>) -> Option<String> {
 /// Generates the author for the embed.
 async fn generate_author(
     manager: &PlayerManager,
-    track: Option<&Track>,
+    player: &PlayerState,
     guild_id: GuildId,
 ) -> Option<CreateEmbedAuthor> {
-    let valid_track = track?;
+    if player.has_destroy_handle {
+        return None;
+    }
+
+    let valid_track = player.track.as_ref()?;
 
     let user = valid_track.requester.to_user(manager).await.ok();
 
