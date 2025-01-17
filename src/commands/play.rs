@@ -78,7 +78,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 match voice_manager.join_gateway(guild_id, voice_channel_id).await {
                     Ok(v) => v.1,
                     Err(e) => {
-                        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = %e, "cannot join the voice channel");
+                        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
                         return Response::new(
                             "play.embed_title",
                             "error.cant_connect",
@@ -93,7 +93,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         None => match voice_manager.join_gateway(guild_id, voice_channel_id).await {
             Ok(e) => e.1,
             Err(e) => {
-                event!(Level::INFO, voice_channel_id = %voice_channel_id, error = %e, "cannot join the voice channel");
+                event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
                 return Response::new(
                     "play.embed_title",
                     "error.cant_connect",
@@ -130,7 +130,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     {
         Ok(e) => e,
         Err(e) => {
-            event!(Level::ERROR, error = %e, guild_id = %guild_id, "cannot play the track");
+            event!(Level::ERROR, error = ?e, guild_id = %guild_id, "cannot play the track");
             return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
