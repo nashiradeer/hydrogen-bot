@@ -417,6 +417,17 @@ impl PlayerManager {
         }))
     }
 
+    /// Get the loop mode for the guild.
+    pub fn get_loop_mode(&self, guild_id: GuildId) -> Option<LoopMode> {
+        self.players.view(&guild_id, |_, p| p.loop_mode)
+    }
+
+    /// Set the loop mode for the guild.
+    pub async fn set_loop_mode(&self, guild_id: GuildId, loop_mode: LoopMode) {
+        self.players
+            .alter(&guild_id, |_, p| Player { loop_mode, ..p });
+    }
+
     /// Starts the player, requesting the Lavalink node to play the music.
     async fn start_player(&self, guild_id: GuildId) -> Result<bool> {
         let player_state = self
