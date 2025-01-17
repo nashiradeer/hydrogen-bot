@@ -1,11 +1,11 @@
 //! 'pause' component execution.
 
 use serenity::all::{ComponentInteraction, Context};
-use tracing::{error, info};
+use tracing::{event, Level};
 
 use crate::{
     handler::{Response, ResponseType},
-    MANAGER,
+    PLAYER_MANAGER,
 };
 
 /// Executes the `pause` command.
@@ -13,10 +13,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
     let guild_id = match interaction.guild_id {
         Some(v) => v,
         None => {
-            info!(
-                "(components::pause): the user {} is not in a guild",
-                interaction.user.id
-            );
+            event!(Level::WARN, "interaction.guild_id is None");
             return Response::new(
                 "pause.embed_title",
                 "error.not_in_guild",
@@ -25,10 +22,10 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
-            error!("(components::pause): the manager is not initialized");
+            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
             return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -39,10 +36,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             .get(&interaction.user.id)
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
-        info!(
-            "(components::pause): the user {} is not in a voice chat in the guild {}",
-            interaction.user.id, guild_id
-        );
+        event!(Level::INFO, "user voice state is None");
         return Response::new(
             "pause.embed_title",
             "error.unknown_voice_state",
@@ -50,16 +44,15 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         );
     };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id).await {
-        if my_channel_id == voice_channel_id.into() {
-            let paused = !manager.get_paused(guild_id).await;
+    let player_state = manager
+        .get_voice_channel_id(guild_id)
+        .zip(manager.get_pause(guild_id));
 
+    if let Some((my_channel_id, paused)) = player_state {
+        if my_channel_id == voice_channel_id {
             // Pause or resume the player.
-            if let Err(e) = manager.set_paused(guild_id, paused).await {
-                error!(
-                    "(components::pause): cannot resume/pause the player in the guild {}: {}",
-                    guild_id, e
-                );
+            if let Err(e) = manager.set_pause(guild_id, !paused).await {
+                event!(Level::ERROR, error = ?e, pause = !paused, "cannot resume/pause the player");
                 return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
             }
 

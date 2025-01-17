@@ -423,9 +423,77 @@ impl PlayerManager {
     }
 
     /// Set the loop mode for the guild.
-    pub async fn set_loop_mode(&self, guild_id: GuildId, loop_mode: LoopMode) {
+    pub fn set_loop_mode(&self, guild_id: GuildId, loop_mode: LoopMode) {
         self.players
             .alter(&guild_id, |_, p| Player { loop_mode, ..p });
+    }
+
+    /// Get the pause state for the guild.
+    pub fn get_pause(&self, guild_id: GuildId) -> Option<bool> {
+        self.players.view(&guild_id, |_, p| p.paused)
+    }
+
+    /// Set the pause state for the guild.
+    pub async fn set_pause(&self, guild_id: GuildId, paused: bool) -> Result<bool> {
+        let player_state = self
+            .get_player_state(guild_id)
+            .ok_or(Error::PlayerNotFound)?;
+
+        self.players.alter(&guild_id, |_, p| Player { paused, ..p });
+
+        let update_player = UpdatePlayer::default().set_paused(paused);
+
+        self.lavalink
+            .update_player(
+                player_state.node_id,
+                &guild_id.to_string(),
+                update_player,
+                true,
+            )
+            .await
+            .map_err(Error::from)?;
+
+        Ok(true)
+    }
+
+    /// Go to the previous track in the queue.
+    pub async fn previous(&self, guild_id: GuildId) -> Result<Option<Track>> {
+        let mut player = self
+            .players
+            .get_mut(&guild_id)
+            .ok_or(Error::InvalidGuildId)?;
+
+        player.currrent_track = if player.currrent_track > 0 {
+            player.currrent_track - 1
+        } else {
+            player.primary_queue.len() - 1
+        };
+
+        let current_track = player.primary_queue.get(player.currrent_track).cloned();
+
+        drop(player);
+
+        self.start_player(guild_id).await?;
+
+        Ok(current_track)
+    }
+
+    /// Go to the next track in the queue.
+    pub async fn skip(&self, guild_id: GuildId) -> Result<Option<Track>> {
+        let mut player = self
+            .players
+            .get_mut(&guild_id)
+            .ok_or(Error::InvalidGuildId)?;
+
+        player.currrent_track = (player.currrent_track + 1) % player.primary_queue.len();
+
+        let current_track = player.primary_queue.get(player.currrent_track).cloned();
+
+        drop(player);
+
+        self.start_player(guild_id).await?;
+
+        Ok(current_track)
     }
 
     /// Starts the player, requesting the Lavalink node to play the music.
