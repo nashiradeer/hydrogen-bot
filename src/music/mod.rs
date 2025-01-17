@@ -514,7 +514,9 @@ impl PlayerManager {
                     false
                 };
 
-                if let Some(player_state) = player_state {
+                let new_player_state = self.get_player_state(guild_id);
+
+                if let Some(player_state) = new_player_state {
                     let (channel_id, message_id) =
                         update_message(self, guild_id, &player_state, thinking).await;
 
