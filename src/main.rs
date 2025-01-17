@@ -48,14 +48,36 @@ pub static COMPONENTS_MESSAGES: LazyLock<
     DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
 > = LazyLock::new(DashMap::new);
 
-#[tokio::main]
-/// Hydrogen's entry point.
-async fn main() {
+/// The program's entry point.
+fn main() {
     registry()
         .with(layer())
         .with(EnvFilter::from_default_env())
         .init();
 
+    let disable_multi_threading = env::var("DISABLE_MULTI_THREADING").is_ok_and(|v| v == "true");
+
+    let mut tokio_runtime_builder = if disable_multi_threading {
+        event!(Level::INFO, "multi-threading is disabled");
+        tokio::runtime::Builder::new_current_thread()
+    } else {
+        event!(Level::INFO, "multi-threading is enabled");
+        tokio::runtime::Builder::new_multi_thread()
+    };
+
+    let tokio_runtime = match tokio_runtime_builder.enable_all().build() {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot create the Tokio runtime");
+            exit(1);
+        }
+    };
+
+    tokio_runtime.block_on(hydrogen());
+}
+
+/// Hydrogen's entry point.
+async fn hydrogen() {
     let lavalink_nodes = init_lavalink();
 
     if lavalink_nodes.is_empty() {
