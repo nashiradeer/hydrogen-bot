@@ -56,7 +56,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
             }
 
-            let translation_key = if paused {
+            let translation_key = if !paused {
                 "pause.paused"
             } else {
                 "pause.resumed"

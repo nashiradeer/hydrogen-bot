@@ -423,9 +423,11 @@ impl PlayerManager {
     }
 
     /// Set the loop mode for the guild.
-    pub fn set_loop_mode(&self, guild_id: GuildId, loop_mode: LoopMode) {
+    pub async fn set_loop_mode(&self, guild_id: GuildId, loop_mode: LoopMode) {
         self.players
             .alter(&guild_id, |_, p| Player { loop_mode, ..p });
+
+        self.update_message(guild_id).await;
     }
 
     /// Get the pause state for the guild.
@@ -439,8 +441,6 @@ impl PlayerManager {
             .get_player_state(guild_id)
             .ok_or(Error::PlayerNotFound)?;
 
-        self.players.alter(&guild_id, |_, p| Player { paused, ..p });
-
         let update_player = UpdatePlayer::default().set_paused(paused);
 
         self.lavalink
@@ -452,6 +452,15 @@ impl PlayerManager {
             )
             .await
             .map_err(Error::from)?;
+
+        let (channel_id, message_id) = update_message(self, guild_id, &player_state, false).await;
+
+        self.players.alter(&guild_id, |_, p| Player {
+            channel_id,
+            message_id,
+            paused,
+            ..p
+        });
 
         Ok(true)
     }

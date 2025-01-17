@@ -54,7 +54,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         if my_channel_id == voice_channel_id {
             let new_loop_mode = current_loop_mode.next();
 
-            manager.set_loop_mode(guild_id, new_loop_mode);
+            manager.set_loop_mode(guild_id, new_loop_mode).await;
 
             let loop_type_translation_key = match new_loop_mode {
                 LoopMode::None => "loop.autostart",
