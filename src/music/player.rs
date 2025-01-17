@@ -301,7 +301,7 @@ impl From<crate::lavalink::Track> for Track {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 /// Play result information.
 pub struct PlayResult {
     /// The track that will be played.
@@ -312,4 +312,15 @@ pub struct PlayResult {
     pub playing: bool,
     /// If the queue was truncated.
     pub truncated: bool,
+}
+
+#[derive(Debug, Clone)]
+/// Seek result information.
+pub struct SeekResult {
+    /// The track that was seeked.
+    pub track: Track,
+    /// The position of the track.
+    pub position: u64,
+    /// The total duration of the track.
+    pub total: u64,
 }

@@ -165,6 +165,19 @@ impl PlayerManager {
             .flatten()
     }
 
+    /// Get the voice channel ID for the guild.
+    ///
+    /// This method will return `None` if the player does not exist too.
+    pub fn get_voice_channel_id(&self, guild_id: GuildId) -> Option<ChannelId> {
+        if !self.contains_player(guild_id) {
+            return None;
+        }
+
+        self.connections
+            .view(&guild_id, |_, c| c.serenity_channel_id())
+            .flatten()
+    }
+
     /// Search for the music using multiple prefixes.
     pub async fn search(&self, node: &Rest, music: &str) -> Result<LoadResult> {
         let result = node.load_track(music).await.map_err(Error::from)?;
@@ -376,6 +389,32 @@ impl PlayerManager {
             playing,
             truncated,
         })
+    }
+
+    /// Seek the player to a certain time.
+    pub async fn seek(&self, guild_id: GuildId, time: Duration) -> Result<Option<SeekResult>> {
+        if !self.contains_player(guild_id) {
+            return Err(Error::PlayerNotFound);
+        }
+
+        let update_player = UpdatePlayer::default().set_position(time.as_millis() as u64);
+
+        let node_id = self
+            .players
+            .view(&guild_id, |_, p| p.node_id)
+            .ok_or(Error::PlayerNotFound)?;
+
+        let player = self
+            .lavalink
+            .update_player(node_id, &guild_id.to_string(), update_player, true)
+            .await
+            .map_err(Error::from)?;
+
+        Ok(player.track.map(|t| SeekResult {
+            position: t.info.position,
+            total: t.info.length,
+            track: Track::from(t),
+        }))
     }
 
     /// Starts the player, requesting the Lavalink node to play the music.
@@ -718,6 +757,8 @@ pub enum Error {
     Serenity(serenity::Error),
     /// The guild channel was not found.
     GuildChannelNotFound,
+    /// There's no player for the guild.
+    PlayerNotFound,
 }
 
 impl Display for Error {
@@ -729,6 +770,7 @@ impl Display for Error {
             Self::NoAvailableLavalink => write!(f, "There's no available Lavalink node"),
             Self::InvalidGuildId => write!(f, "Invalid guild ID"),
             Self::GuildChannelNotFound => write!(f, "Guild channel was not found"),
+            Self::PlayerNotFound => write!(f, "Player not found"),
         }
     }
 }
