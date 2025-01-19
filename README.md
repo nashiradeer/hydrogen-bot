@@ -10,7 +10,7 @@ To develop Hydrogen, you need to have [Docker](https://docker.com) and [Visual S
 
 ## Using
 
-Hydrogen is available on our [GitHub Container Registry](https://github.com/nashiradeer/hydrogen-bot/pkgs/container/hydrogen-bot), you can use it by running `docker run -e DISCORD_TOKEN=your_token -e LAVALINK=your_lavalink_host ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.11-alpine` in a terminal with [Docker](https://docker.com) installed and running, replacing `your_token` with your Discord bot token and `your_lavalink_host` with your Lavalink host. You can also use the Debian variant by replacing `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.11-alpine` with `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.11-debian`.
+Hydrogen is available on our [GitHub Container Registry](https://github.com/nashiradeer/hydrogen-bot/pkgs/container/hydrogen-bot), you can use it by running `docker run -e DISCORD_TOKEN=your_token -e LAVALINK=your_lavalink_host ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.12-alpine` in a terminal with [Docker](https://docker.com) installed and running, replacing `your_token` with your Discord bot token and `your_lavalink_host` with your Lavalink host. You can also use the Debian variant by replacing `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.12-alpine` with `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.12-debian`.
 
 ## Building
 
