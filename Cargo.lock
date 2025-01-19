@@ -800,13 +800,11 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 name = "hydrogen"
 version = "0.0.1-alpha.12"
 dependencies = [
- "async-trait",
  "dashmap 6.1.0",
  "futures",
  "http 1.2.0",
  "parking_lot",
  "phf",
- "rand",
  "regex",
  "reqwest 0.12.12",
  "serde",
@@ -815,7 +813,6 @@ dependencies = [
  "songbird",
  "tokio",
  "tokio-tungstenite 0.26.1",
- "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]

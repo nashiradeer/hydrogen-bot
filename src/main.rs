@@ -6,7 +6,6 @@ use std::{
     time::Instant,
 };
 
-use async_trait::async_trait;
 use dashmap::DashMap;
 use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
 use lavalink::{cluster::Cluster, Rest};
@@ -149,7 +148,7 @@ pub struct HydrogenHandler {
     lavalink_nodes: Mutex<Option<Vec<Rest>>>,
 }
 
-#[async_trait]
+#[serenity::async_trait]
 impl EventHandler for HydrogenHandler {
     #[instrument(skip_all)]
     /// Handles the ready event.

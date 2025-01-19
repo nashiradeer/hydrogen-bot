@@ -10,15 +10,12 @@ keywords = ["discord", "lavalink", "music"]
 publish = false
 
 [dependencies]
-async-trait = "0.1.83"
 dashmap = "6.1.0"
 futures = "0.3.31"
 http = "1.2.0"
 parking_lot = "0.12.3"
-rand = "0.8.5"
 regex = "1.11.1"
 serde_json = "1.0.132"
-tokio-util = "0.7.13"
 
 [dependencies.phf]
 version = "0.11.2"
