@@ -11,6 +11,7 @@
 
 - Add Spotify as the default search provider.
 - Avoid recalculations on pause component.
+- Update dependencies.
 
 ### Removed
 
