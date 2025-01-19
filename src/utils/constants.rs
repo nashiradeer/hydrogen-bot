@@ -15,7 +15,8 @@ pub const HYDROGEN_EMPTY_CHAT_TIMEOUT: u64 = 10;
 pub const HYDROGEN_QUEUE_LIMIT: usize = 1000;
 
 /// The search prefixes for the music.
-pub static HYDROGEN_SEARCH_PREFIXES: [&str; 3] = ["ytsearch:", "dzsearch:", "scsearch:"];
+pub static HYDROGEN_SEARCH_PREFIXES: [&str; 4] =
+    ["spsearch:", "ytsearch:", "dzsearch:", "scsearch:"];
 
 /// Connection timeout for the Lavalink node in seconds.
 pub const LAVALINK_RECONNECTION_DELAY: u64 = 5;
