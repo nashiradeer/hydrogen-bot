@@ -1,5 +1,11 @@
 # Hydrogen // Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Avoid recalculations on pause component.
+
 ## [0.0.1-alpha.12] - 2025-01-18
 
 ### Added

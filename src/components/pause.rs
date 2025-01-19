@@ -50,13 +50,14 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
     if let Some((my_channel_id, paused)) = player_state {
         if my_channel_id == voice_channel_id {
-            // Pause or resume the player.
-            if let Err(e) = manager.set_pause(guild_id, !paused).await {
-                event!(Level::ERROR, error = ?e, pause = !paused, "cannot resume/pause the player");
+            let new_paused = !paused;
+
+            if let Err(e) = manager.set_pause(guild_id, new_paused).await {
+                event!(Level::ERROR, error = ?e, pause = new_paused, "cannot resume/pause the player");
                 return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
             }
 
-            let translation_key = if !paused {
+            let translation_key = if new_paused {
                 "pause.paused"
             } else {
                 "pause.resumed"
