@@ -4,7 +4,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable",
+      "name": "Debug (CodeLLDB)",
       "cargo": {
         "args": ["build", "--bin=hydrogen", "--package=hydrogen"],
         "filter": {
@@ -12,11 +12,8 @@
           "kind": "bin"
         }
       },
-      "envFile": "${workspaceFolder}/.env",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "RUST_LOG": "hydrogen=debug"
-      }
+      "envFile": "${workspaceFolder}/dev/.env",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

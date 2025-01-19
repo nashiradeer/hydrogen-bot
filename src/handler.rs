@@ -6,10 +6,10 @@ use serenity::{
     all::{ChannelId, Command, CommandInteraction, ComponentInteraction, UserId},
     builder::{CreateEmbed, CreateEmbedFooter, EditInteractionResponse},
     client::Context,
-    http::{CacheHttp, Http},
+    http::Http,
 };
-use tokio::{spawn, time::sleep};
-use tracing::{debug, error, info, warn};
+use tokio::time::sleep;
+use tracing::{event, instrument, Level};
 
 use crate::{
     commands, components,
@@ -22,9 +22,10 @@ use crate::{
 pub type AutoRemoverKey = (ChannelId, UserId);
 
 /// Handles a command interaction.
+#[instrument(skip_all, name = "command_handler", fields(command_name = %command.data.name, user_id = %command.user.id, guild_id = ?command.guild_id.map(|v| v.get()), channel_id = %command.channel_id))]
 pub async fn handle_command(context: &Context, command: &CommandInteraction) {
     if let Err(e) = command.defer_ephemeral(&context.http).await {
-        error!("(handle_command): failed to defer interaction: {}", e);
+        event!(Level::ERROR, error = ?e, "failed to defer interaction");
         return;
     }
 
@@ -34,7 +35,11 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
         response.map(|response| response.into_edit_interaction_response(&command.locale))
     {
         if let Err(e) = command.edit_response(&context.http, message).await {
-            error!("(handle_command): cannot respond to the interaction: {}", e);
+            event!(
+                Level::ERROR,
+                error = ?e,
+                "cannot edit the response"
+            );
         }
     }
 }
@@ -42,7 +47,7 @@ pub async fn handle_command(context: &Context, command: &CommandInteraction) {
 /// Handles a component interaction.
 pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
     if let Err(e) = component.defer_ephemeral(&context.http).await {
-        error!("(handle_component): failed to defer interaction: {}", e);
+        event!(Level::ERROR, error = ?e, "failed to defer interaction");
         return;
     }
 
@@ -55,7 +60,7 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
             Ok(v) => {
                 let auto_remover_key = (v.channel_id, component.user.id);
 
-                let auto_remover = spawn(async move {
+                let auto_remover = tokio::spawn(async move {
                     autoremover(auto_remover_key).await;
                 });
 
@@ -64,19 +69,13 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
                 {
                     auto_remover.abort();
 
-                    if let Err(e) = old_component.delete_response(context.http()).await {
-                        warn!(
-                            "(handle_component): cannot delete the message {:?}: {}",
-                            auto_remover_key, e
-                        );
+                    if let Err(e) = old_component.delete_response(&context.http).await {
+                        event!(Level::WARN, error = ?e, ?auto_remover_key, "cannot delete the message");
                     }
                 }
             }
             Err(e) => {
-                error!(
-                    "(handle_component): cannot respond to the interaction: {}",
-                    e
-                );
+                event!(Level::ERROR, error = ?e, "cannot edit the response");
             }
         }
     }
@@ -86,14 +85,15 @@ pub async fn handle_component(context: &Context, component: &ComponentInteractio
 pub async fn register_commands(http: impl AsRef<Http>) -> bool {
     let commands = commands::all_create_commands();
 
-    debug!(
-        "(register_command): registering {} commands...",
-        commands.len()
+    event!(
+        Level::DEBUG,
+        commands_count = commands.len(),
+        "registering commands..."
     );
 
     match Command::set_global_commands(http, commands.to_vec()).await {
         Ok(v) => {
-            info!("(register_command): registered {} commands", v.len());
+            event!(Level::INFO, commands_count = v.len(), "registered commands");
 
             let mut commands_id = HashMap::new();
 
@@ -101,14 +101,14 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
                 commands_id.insert(commands.name.clone(), commands.id);
             }
 
-            LOADED_COMMANDS
-                .set(commands_id)
-                .expect("cannot set the loaded commands");
+            if LOADED_COMMANDS.set(commands_id).is_err() {
+                event!(Level::WARN, "cannot set the loaded commands");
+            }
 
             true
         }
         Err(e) => {
-            error!("(register_command): cannot register the commands: {}", e);
+            event!(Level::ERROR, error = ?e, "cannot register the commands");
 
             false
         }
@@ -116,9 +116,10 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
 }
 
 /// Removes the response after a certain time.
+#[instrument(name = "message_autoremover")]
 async fn autoremover(key: AutoRemoverKey) {
     sleep(Duration::from_secs(10)).await;
-    debug!("(autoremover): removing response {:?} from cache...", key);
+    event!(Level::DEBUG, message = ?key, "removing response from cache...");
     COMPONENTS_MESSAGES.remove(&key);
 }
 
@@ -185,7 +186,7 @@ pub enum ResponseValue<'a> {
     RawString(String),
 }
 
-impl<'a> ResponseValue<'a> {
+impl ResponseValue<'_> {
     /// Converts the [ResponseValue] into its value.
     pub fn into_value(self, lang: &str) -> String {
         match self {

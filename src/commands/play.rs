@@ -3,7 +3,7 @@
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
 };
-use tracing::{error, info, warn};
+use tracing::{event, Level};
 
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
@@ -11,8 +11,8 @@ use crate::{
         serenity_command_description, serenity_command_name, serenity_command_option_description,
         serenity_command_option_name, t, t_vars,
     },
-    player::HydrogenPlayCommand,
-    MANAGER,
+    music::PlayResult,
+    PLAYER_MANAGER,
 };
 
 /// Executes the `/play` command.
@@ -20,10 +20,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let guild_id = match interaction.guild_id {
         Some(v) => v,
         None => {
-            info!(
-                "(commands::play): the user {} is not in a guild",
-                interaction.user.id
-            );
+            event!(Level::WARN, "interaction.guild_id is None");
             return Response::new(
                 "play.embed_title",
                 "error.not_in_guild",
@@ -32,10 +29,10 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
-            error!("(commands::play): the manager is not initialized");
+            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
             return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -46,7 +43,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         .first()
         .and_then(|v| v.value.as_str())
     else {
-        error!("(commands::play): cannot get the 'query' option");
+        event!(Level::WARN, "no query provided");
         return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
     };
 
@@ -56,10 +53,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             .get(&interaction.user.id)
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
-        info!(
-            "(commands::play): the user {} is not in a voice chat in the guild {}",
-            interaction.user.id, guild_id
-        );
+        event!(Level::INFO, "user voice state is None");
         return Response::new(
             "play.embed_title",
             "error.unknown_voice_state",
@@ -70,7 +64,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     let voice_manager = match songbird::get(context).await {
         Some(v) => v,
         None => {
-            error!("(commands::play): cannot get the voice manager");
+            event!(Level::ERROR, "songbird::get() returned None");
             return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -84,10 +78,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 match voice_manager.join_gateway(guild_id, voice_channel_id).await {
                     Ok(v) => v.1,
                     Err(e) => {
-                        warn!(
-                            "(commands::play): cannot connect to the voice channel in the guild {}: {}",
-                            guild_id, e
-                        );
+                        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
                         return Response::new(
                             "play.embed_title",
                             "error.cant_connect",
@@ -102,10 +93,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         None => match voice_manager.join_gateway(guild_id, voice_channel_id).await {
             Ok(e) => e.1,
             Err(e) => {
-                warn!(
-                    "(commands::play): cannot connect to the voice channel in the guild {}: {}",
-                    guild_id, e
-                );
+                event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
                 return Response::new(
                     "play.embed_title",
                     "error.cant_connect",
@@ -128,25 +116,21 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     }
 
     let result = match manager
-        .init_or_play(
+        .play(
+            query,
+            interaction.user.id,
             guild_id,
+            interaction.channel_id,
             &interaction
                 .guild_locale
                 .clone()
                 .unwrap_or(interaction.locale.clone()),
-            query,
-            interaction.user.id,
-            voice_manager.clone(),
-            interaction.channel_id,
         )
         .await
     {
         Ok(e) => e,
         Err(e) => {
-            warn!(
-                "(commands::play): cannot play the music in the guild {}: {}",
-                guild_id, e
-            );
+            event!(Level::ERROR, error = ?e, guild_id = %guild_id, "cannot play the track");
             return Response::new("play.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -154,7 +138,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     if result.count > 0 {
         Response::raw(
             ResponseValue::TranslationKey("play.embed_title"),
-            ResponseValue::RawString(get_message(result, interaction)),
+            ResponseValue::RawString(generate_message(result, interaction)),
             ResponseType::Success,
         )
     } else if !result.truncated {
@@ -195,18 +179,23 @@ pub fn create_command() -> CreateCommand {
             .dm_permission(false)
 }
 
-/// Get the message to send to the user.
-fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) -> String {
+/// Generates the message from the result from the player.
+fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> String {
+    event!(
+        Level::TRACE,
+        result = ?result,
+        "generating message from PlayResult"
+    );
     if let Some(track) = result.track {
         if result.playing && result.count == 1 {
-            if let Some(uri) = track.uri {
+            if let Some(url) = track.url {
                 return t_vars(
                     &interaction.locale,
                     "play.play_single_url",
                     [
                         ("name", track.title),
                         ("author", track.author),
-                        ("url", uri),
+                        ("url", url),
                     ],
                 );
             } else {
@@ -217,14 +206,14 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                 );
             }
         } else if result.count == 1 {
-            if let Some(uri) = track.uri {
+            if let Some(url) = track.url {
                 return t_vars(
                     &interaction.locale,
                     "play.enqueue_single_url",
                     [
                         ("name", track.title),
                         ("author", track.author),
-                        ("url", uri),
+                        ("url", url),
                     ],
                 );
             } else {
@@ -236,14 +225,14 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
             }
         } else if result.playing {
             if !result.truncated {
-                if let Some(uri) = track.uri {
-                    t_vars(
+                if let Some(url) = track.url {
+                    return t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
                         [
                             ("name", track.title),
                             ("author", track.author),
-                            ("url", uri),
+                            ("url", url),
                             ("count", result.count.to_string()),
                         ],
                     );
@@ -258,7 +247,7 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                         ],
                     );
                 }
-            } else if let Some(uri) = track.uri {
+            } else if let Some(url) = track.url {
                 return format!(
                     "{}\n\n{}",
                     t(&interaction.locale, "play.truncated_warn"),
@@ -268,7 +257,7 @@ fn get_message(result: HydrogenPlayCommand, interaction: &CommandInteraction) ->
                         [
                             ("name", track.title),
                             ("author", track.author),
-                            ("url", uri),
+                            ("url", url),
                             ("count", result.count.to_string()),
                         ]
                     ),

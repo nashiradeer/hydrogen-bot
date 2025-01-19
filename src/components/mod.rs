@@ -18,7 +18,7 @@ pub async fn execute<'a>(
     component: &ComponentInteraction,
 ) -> Option<Response<'a>> {
     Some(match component.data.custom_id.as_str() {
-        "loop_switch" => loop_switch::execute(context, component).await,
+        "loop" => loop_switch::execute(context, component).await,
         "pause" => pause::execute(context, component).await,
         "prev" => prev::execute(context, component).await,
         "skip" => skip::execute(context, component).await,

@@ -1,44 +1,40 @@
 [package]
 name = "hydrogen"
-version = "0.0.1-alpha.11"
+version = "0.0.1-alpha.12"
 authors = ["Nashira Deer <nashiradeer@gmail.com>"]
 edition = "2021"
+rust-version = "1.84.0"
 description = "Discord music bot powered by Lavalink and focusing on performance, features, usability and practicality."
 readme = "README.md"
 keywords = ["discord", "lavalink", "music"]
 publish = false
 
 [dependencies]
-async-trait = "0.1.83"
 dashmap = "6.1.0"
 futures = "0.3.31"
-http = "1.1.0"
-rand = "0.8.5"
+http = "1.2.0"
+parking_lot = "0.12.3"
 regex = "1.11.1"
 serde_json = "1.0.132"
-tokio-util = "0.7.13"
-tracing = "0.1.37"
 
 [dependencies.phf]
 version = "0.11.2"
 features = ["macros"]
 
 [dependencies.tokio-tungstenite]
-version = "0.24.0"
+version = "0.26.1"
 features = ["rustls-tls-webpki-roots"]
 
 [dependencies.reqwest]
-version = "0.12.9"
+version = "0.12.12"
 default-features = false
 features = ["rustls-tls-webpki-roots", "json"]
 
 [dependencies.serde]
-package = "serde"
 version = "1.0.214"
 features = ["derive"]
 
 [dependencies.serenity]
-package = "serenity"
 version = "0.12.2"
 default-features = false
 features = [
@@ -55,17 +51,18 @@ features = [
 ]
 
 [dependencies.songbird]
-package = "songbird"
 version = "0.4.3"
 default-features = false
 features = ["gateway", "serenity", "rustls"]
 
 [dependencies.tokio]
-package = "tokio"
 version = "1.41.0"
-features = ["macros", "rt-multi-thread"]
+features = ["macros", "rt-multi-thread", "parking_lot"]
+
+[dependencies.tracing]
+version = "0.1.37"
+features = ["release_max_level_debug", "max_level_trace"]
 
 [dependencies.tracing-subscriber]
-package = "tracing-subscriber"
 version = "0.3.17"
 features = ["env-filter"]

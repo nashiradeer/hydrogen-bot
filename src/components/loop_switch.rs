@@ -1,13 +1,13 @@
 //! 'loop' component execution.
 
 use serenity::all::{ComponentInteraction, Context};
-use tracing::{error, info};
+use tracing::{event, Level};
 
 use crate::{
     handler::{Response, ResponseType, ResponseValue},
     i18n::{t, t_vars},
-    player::LoopType,
-    MANAGER,
+    music::LoopMode,
+    PLAYER_MANAGER,
 };
 
 /// Executes the `loop` command.
@@ -15,10 +15,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
     let guild_id = match interaction.guild_id {
         Some(v) => v,
         None => {
-            info!(
-                "(components::loop): the user {} is not in a guild",
-                interaction.user.id
-            );
+            event!(Level::WARN, "interaction.guild_id is None");
             return Response::new(
                 "loop.embed_title",
                 "error.not_in_guild",
@@ -27,10 +24,10 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         }
     };
 
-    let manager = match MANAGER.get() {
+    let manager = match PLAYER_MANAGER.get() {
         Some(v) => v,
         None => {
-            error!("(components::loop): the manager is not initialized");
+            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
             return Response::new("loop.embed_title", "error.unknown", ResponseType::Error);
         }
     };
@@ -41,10 +38,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             .get(&interaction.user.id)
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
-        info!(
-            "(components::loop): the user {} is not in a voice chat in the guild {}",
-            interaction.user.id, guild_id
-        );
+        event!(Level::INFO, "user voice state is None");
         return Response::new(
             "loop.embed_title",
             "error.unknown_voice_state",
@@ -52,26 +46,21 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         );
     };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id).await {
-        if my_channel_id == voice_channel_id.into() {
-            let current_loop_type = manager.get_loop_type(guild_id).await;
+    let player_state = manager
+        .get_voice_channel_id(guild_id)
+        .zip(manager.get_loop_mode(guild_id));
 
-            let new_loop_type = match current_loop_type {
-                LoopType::None => LoopType::NoAutostart,
-                LoopType::NoAutostart => LoopType::Music,
-                LoopType::Music => LoopType::Queue,
-                LoopType::Queue => LoopType::Random,
-                LoopType::Random => LoopType::None,
-            };
+    if let Some((my_channel_id, current_loop_mode)) = player_state {
+        if my_channel_id == voice_channel_id {
+            let new_loop_mode = current_loop_mode.next();
 
-            manager.set_loop_type(guild_id, new_loop_type.clone()).await;
+            manager.set_loop_mode(guild_id, new_loop_mode).await;
 
-            let loop_type_translation_key = match new_loop_type {
-                LoopType::None => "loop.autostart",
-                LoopType::NoAutostart => "loop.no_autostart",
-                LoopType::Music => "loop.music",
-                LoopType::Queue => "loop.queue",
-                LoopType::Random => "loop.random",
+            let loop_type_translation_key = match new_loop_mode {
+                LoopMode::None => "loop.autostart",
+                LoopMode::Autopause => "loop.no_autostart",
+                LoopMode::Single => "loop.music",
+                LoopMode::All => "loop.queue",
             };
 
             let loop_type_translation = t(&interaction.locale, loop_type_translation_key);
