@@ -1,20 +1,5 @@
 # Hydrogen // TODO list
 
-## 0.0.1-alpha.12
-
-- [x] Create a Dev Container. ([#7](https://github.com/nashiradeer/hydrogen-bot/issues/7))
-- [x] Fix play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
-- [x] Recreate the Music Player message system.
-- [x] Recreate logs messages.
-- [x] Reimplement loop_switch component.
-- [x] Reimplement pause component.
-- [x] Reimplement previous component.
-- [x] Reimplement skip component.
-- [x] Reimplement stop component.
-- [x] Reimplement seek commmand.
-- [x] Update dependencies.
-- [ ] Create a new icon for the bot.
-
 ## 0.0.1-alpha.13
 
 - [ ] Migrate to `dynfmt` crate instead of a lot of `String::replace`.
