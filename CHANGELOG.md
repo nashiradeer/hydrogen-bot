@@ -5,6 +5,7 @@
 ### Fixed
 
 - Typo in Severity enum (Suspicous -> Suspicious).
+- Play command is only returning the current track instead of the new one.
 
 ### Changed
 

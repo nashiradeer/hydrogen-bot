@@ -350,7 +350,12 @@ impl PlayerManager {
             }
         };
 
-        let mut this_play_track = player_state.track.clone();
+        let mut this_play_track = self
+            .players
+            .view(&guild_id, |_, p| {
+                p.primary_queue.get(original_queue_size).cloned()
+            })
+            .flatten();
 
         if lavalink_not_playing {
             let mut index =
