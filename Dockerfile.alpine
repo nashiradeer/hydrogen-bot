@@ -11,5 +11,4 @@ FROM alpine:3.21.2
 RUN apk -U upgrade
 WORKDIR /app
 COPY --from=builder /app/target/release/hydrogen hydrogen
-ENV RUST_LOG=hydrogen=warn
 CMD ["/app/hydrogen"]

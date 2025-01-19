@@ -12,6 +12,10 @@
 - Add Spotify as the default search provider.
 - Avoid recalculations on pause component.
 
+### Removed
+
+- Default log level for the Docker images.
+
 ## [0.0.1-alpha.12] - 2025-01-18
 
 ### Added
