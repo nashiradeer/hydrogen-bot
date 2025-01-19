@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Typo in Severity enum (Suspicous -> Suspicious).
+
 ### Changed
 
 - Avoid recalculations on pause component.
