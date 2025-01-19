@@ -5,7 +5,7 @@
 /icons
 /.devcontainer
 /dev
-.env
 .gitignore
 CHANGELOG.md
 README.md
+TODO.md
