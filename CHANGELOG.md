@@ -1,5 +1,48 @@
 # Hydrogen // Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Typo in Severity enum (Suspicous -> Suspicious).
+- Play command is only returning the current track instead of the new one.
+
+### Changed
+
+- Add Spotify as the default search provider.
+- Avoid recalculations on pause component.
+- Update dependencies.
+
+### Removed
+
+- Default log level for the Docker images.
+
+## [0.0.1-alpha.12] - 2025-01-18
+
+### Added
+
+- Add a config option to disable multithreading.
+
+### Changed
+
+- Change Lavalink configuration to the new database URL-like format.
+- Implement a database URL-like configuration for Lavalink.
+- Implement cluster support in the Lavalink client.
+- Refactor the player and it manager.
+- Reimplement the Lavalink client using v4 API.
+- Reimplement the Lavalink client to use Enum-returning functions (like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
+- Update to Alpine 3.21.
+- Update to Rust 1.84.0.
+- Update the dependencies.
+
+### Fixed
+
+- Wrong play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+
+### Removed
+
+- Remove the Random loop mode.
+
 ## [0.0.1-alpha.11] - 2024-11-06
 
 ### Fixed

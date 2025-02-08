@@ -21,22 +21,19 @@ impl ConfigParser {
     }
 
     /// Parses the configuration string into a list of [`Rest`] instances.
-    pub fn parse(&self, value: String) -> Vec<Rest> {
+    pub fn parse(&self, value: &str) -> Vec<Rest> {
         self.single_string_regex
-            .captures_iter(&value)
+            .captures_iter(value)
             .filter_map(|cap| {
                 let host = cap.get(1)?;
-                let password = cap.get(3)?;
+                let password = cap.get(2)?;
 
-                if let Some(query) = cap.get(4) {
-                    Some(Rest::new(
-                        host.as_str(),
-                        password.as_str(),
-                        query.as_str() == "tls",
-                    ))
+                if let Some(query) = cap.get(3) {
+                    Rest::new(host.as_str(), password.as_str(), query.as_str() == "tls").ok()
                 } else {
-                    Some(Rest::new(host.as_str(), password.as_str(), false))
+                    Rest::new(host.as_str(), password.as_str(), false).ok()
                 }
             })
+            .collect()
     }
 }

@@ -2,15 +2,15 @@ use std::{
     collections::HashMap,
     env,
     process::exit,
-    sync::{LazyLock, OnceLock},
+    sync::{Arc, LazyLock, OnceLock},
     time::Instant,
 };
 
-use async_trait::async_trait;
 use dashmap::DashMap;
 use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
-use lavalink::LavalinkNodeInfo;
-use manager::HydrogenManager;
+use lavalink::{cluster::Cluster, Rest};
+use music::PlayerManager;
+use parking_lot::Mutex;
 use serenity::{
     all::{
         Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Ready,
@@ -20,9 +20,12 @@ use serenity::{
 };
 use songbird::SerenityInit;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{event, instrument, Level};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+};
+use utils::constants::{
+    HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD, HYDROGEN_UPDATE_VOICE_STATE_THRESHOLD,
 };
 
 mod commands;
@@ -30,175 +33,254 @@ mod components;
 mod handler;
 mod i18n;
 pub mod lavalink;
-mod manager;
-mod player;
+mod music;
 mod utils;
 
 /// The commands IDs that are registered.
 pub static LOADED_COMMANDS: OnceLock<HashMap<String, CommandId>> = OnceLock::new();
 
 /// Hydrogen's Player Manager.
-pub static MANAGER: OnceLock<HydrogenManager> = OnceLock::new();
+pub static PLAYER_MANAGER: OnceLock<PlayerManager> = OnceLock::new();
 
 /// The messages from the components.
 pub static COMPONENTS_MESSAGES: LazyLock<
     DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
 > = LazyLock::new(DashMap::new);
 
-/// Lavalink node.
-pub static LAVALINK_NODE: OnceLock<LavalinkNodeInfo> = OnceLock::new();
-
-#[tokio::main]
-/// Hydrogen's main function.
-async fn main() {
+/// The program's entry point.
+fn main() {
     registry()
         .with(layer())
         .with(EnvFilter::from_default_env())
         .init();
 
-    LAVALINK_NODE
-        .set(LavalinkNodeInfo {
-            host: env::var("LAVALINK_HOST").expect("LAVALINK_HOST is not set or invalid unicode"),
-            password: env::var("LAVALINK_PASSWORD")
-                .expect("LAVALINK_PASSWORD is not set or invalid unicode"),
-            tls: env::var_os("LAVALINK_TLS").is_some(),
-        })
-        .expect("cannot set LAVALINK_NODE");
+    let disable_multi_threading = env::var("DISABLE_MULTI_THREADING").is_ok_and(|v| v == "true");
 
-    let mut client = Client::builder(
-        env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN is not set or invalid unicode"),
+    let mut tokio_runtime_builder = if disable_multi_threading {
+        event!(Level::INFO, "multi-threading is disabled");
+        tokio::runtime::Builder::new_current_thread()
+    } else {
+        event!(Level::INFO, "multi-threading is enabled");
+        tokio::runtime::Builder::new_multi_thread()
+    };
+
+    let tokio_runtime = match tokio_runtime_builder.enable_all().build() {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot create the Tokio runtime");
+            exit(1);
+        }
+    };
+
+    tokio_runtime.block_on(hydrogen());
+}
+
+/// Hydrogen's entry point.
+async fn hydrogen() {
+    let lavalink_nodes = init_lavalink();
+
+    if lavalink_nodes.is_empty() {
+        event!(Level::ERROR, "no Lavalink nodes were found");
+        exit(1);
+    }
+
+    let discord_token = match env::var("DISCORD_TOKEN") {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot get the Discord token");
+            exit(1);
+        }
+    };
+
+    let mut client = match Client::builder(
+        &discord_token,
         GatewayIntents::GUILDS
             | GatewayIntents::GUILD_VOICE_STATES
             | GatewayIntents::MESSAGE_CONTENT
             | GatewayIntents::GUILD_MESSAGES,
     )
-    .event_handler(HydrogenHandler)
+    .event_handler(HydrogenHandler {
+        lavalink_nodes: Mutex::new(Some(lavalink_nodes)),
+    })
     .register_songbird()
     .await
-    .expect("cannot initialize client");
+    {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot create the client");
+            exit(1);
+        }
+    };
 
-    client.start().await.expect("cannot start client");
+    match client.start().await {
+        Ok(_) => (),
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot start the client");
+            exit(1);
+        }
+    }
 }
 
-pub struct HydrogenHandler;
-
-#[async_trait]
-impl EventHandler for HydrogenHandler {
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        let timer = Instant::now();
-        debug!("(ready): processing...");
-
-        if MANAGER
-            .set(HydrogenManager::new(ctx.cache.clone(), ctx.http.clone()))
-            .is_err()
-        {
-            error!("(ready): cannot set HydrogenManager in OnceLock");
+/// Initializes the Lavalink nodes.
+fn init_lavalink() -> Vec<Rest> {
+    let lavalink_builder = match lavalink::hydrogen::ConfigParser::new() {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot create the Lavalink builder");
             exit(1);
         }
+    };
 
-        debug!("(ready): HydrogenManager initialized");
+    let lavalink = match env::var("LAVALINK") {
+        Ok(v) => v,
+        Err(e) => {
+            event!(Level::ERROR, error = ?e, "cannot get the Lavalink URL");
+            exit(1);
+        }
+    };
+
+    lavalink_builder.parse(&lavalink)
+}
+
+/// The Hydrogen handler.
+pub struct HydrogenHandler {
+    /// The Lavalink nodes.
+    lavalink_nodes: Mutex<Option<Vec<Rest>>>,
+}
+
+#[serenity::async_trait]
+impl EventHandler for HydrogenHandler {
+    #[instrument(skip_all)]
+    /// Handles the ready event.
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        event!(Level::DEBUG, "initializing Hydrogen...");
+        let init_time = Instant::now();
+
+        let Some(songbird) = songbird::get(&ctx).await else {
+            event!(Level::ERROR, "songbird is not initialized");
+            exit(1);
+        };
+
+        let Some(lavalink_nodes) = self.lavalink_nodes.lock().take() else {
+            event!(Level::ERROR, "Lavalink nodes are not initialized");
+            exit(1);
+        };
+
+        event!(
+            Level::INFO,
+            node_count = lavalink_nodes.len(),
+            "connecting to Lavalink nodes..."
+        );
+
+        if PLAYER_MANAGER
+            .set(
+                PlayerManager::new(
+                    songbird,
+                    Arc::new(Cluster::new(lavalink_nodes, &ready.user.id.to_string()).await),
+                    ctx.cache.clone(),
+                    ctx.http.clone(),
+                )
+                .await,
+            )
+            .is_err()
+        {
+            event!(Level::ERROR, "cannot set the PlayerManager");
+            exit(1);
+        }
 
         if !register_commands(&ctx.http).await {
-            error!("(ready): cannot register commands");
             exit(1);
         }
 
-        let Some(manager) = MANAGER.get() else {
-            error!("(ready): cannot get HydrogenManager from OnceLock");
-            exit(1);
-        };
-
-        let Some(lavalink_node) = LAVALINK_NODE.get() else {
-            error!("(ready): cannot get LavalinkNodeInfo from OnceLock");
-            exit(1);
-        };
-
-        if manager
-            .connect_lavalink(lavalink_node.clone())
-            .await
-            .is_err()
-        {
-            error!("(ready): cannot connect to Lavalink");
-            exit(1);
+        let exec_time = init_time.elapsed();
+        if exec_time > utils::constants::HYDROGEN_READY_THRESHOLD {
+            event!(Level::WARN, time = ?exec_time, user_name = %ready.user.name, "initializing Hydrogen took too long");
+        } else {
+            event!(Level::INFO, time = ?exec_time, user_name = %ready.user.name, "initialized Hydrogen");
         }
-
-        info!(
-            "(ready): client connected to '{}' in {}ms",
-            ready.user.name,
-            timer.elapsed().as_millis()
-        );
     }
 
+    #[instrument(skip_all, fields(interaction.id = %interaction.id(), interaction.kind = ?interaction.kind()))]
+    /// Handles the interaction create event.
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let timer = Instant::now();
-        debug!("(interaction_create): processing...");
+        event!(Level::DEBUG, "handling interaction...");
+        let init_time = Instant::now();
 
         match interaction {
-            Interaction::Command(command) => {
-                handle_command(&ctx, &command).await;
-
-                info!(
-                    "(interaction_create): command '{}' executed in {}ms",
-                    command.data.name,
-                    timer.elapsed().as_millis()
-                );
-            }
-            Interaction::Component(component) => {
-                handle_component(&ctx, &component).await;
-
-                info!(
-                    "(interaction_create): component '{}' executed in {}ms",
-                    component.data.custom_id,
-                    timer.elapsed().as_millis()
-                );
-            }
+            Interaction::Command(command) => handle_command(&ctx, &command).await,
+            Interaction::Component(component) => handle_component(&ctx, &component).await,
             _ => (),
         }
-    }
 
-    async fn voice_state_update(&self, _: Context, old: Option<VoiceState>, new: VoiceState) {
-        let timer = Instant::now();
-        debug!("(voice_state_update): processing...");
-
-        if let Some(manager) = MANAGER.get() {
-            match manager.update_voice_state(old, new).await {
-                Ok(updated) => {
-                    if updated {
-                        info!(
-                            "(voice_state_update): processed in {}ms...",
-                            timer.elapsed().as_millis()
-                        );
-                    } else {
-                        debug!("(voice_state_update): ignored");
-                    }
-                }
-                Err(e) => {
-                    warn!("(voice_state_update): cannot update the HydrogenManager's player voice state: {}", e);
-                }
-            }
+        let exec_time = init_time.elapsed();
+        if exec_time > utils::constants::HYDROGEN_INTERACTION_CREATE_THRESHOLD {
+            event!(
+                Level::WARN,
+                time = ?exec_time,
+                "handling the interaction took too long"
+            );
+        } else {
+            event!(
+                Level::INFO,
+                time = ?exec_time,
+                "interaction handled"
+            );
         }
     }
 
-    async fn voice_server_update(&self, _: Context, voice_server: VoiceServerUpdateEvent) {
-        let timer = Instant::now();
-        debug!("(voice_server_update): processing...");
+    #[instrument(skip_all, fields(user_id = %new.user_id, guild_id = ?new.guild_id.map(|v| v.get()), channel_id = ?new.channel_id.map(|v| v.get())))]
+    /// Handles the voice state update event.
+    async fn voice_state_update(&self, _ctx: Context, old: Option<VoiceState>, new: VoiceState) {
+        event!(Level::DEBUG, "updating voice state...");
+        let init_time = Instant::now();
 
-        if let Some(manager) = MANAGER.get() {
-            match manager.update_voice_server(voice_server).await {
-                Ok(updated) => {
-                    if updated {
-                        info!(
-                            "(voice_server_update): processed in {}ms...",
-                            timer.elapsed().as_millis()
-                        );
-                    } else {
-                        debug!("(voice_server_update): ignored");
-                    }
-                }
-                Err(e) => {
-                    warn!("(voice_server_update): cannot update HydrogenManager's player voice server: {}", e);
-                }
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_state(old.as_ref(), &new).await {
+                event!(Level::ERROR, error = ?e, "cannot update the voice state");
             }
+        }
+
+        let exec_time = init_time.elapsed();
+        if exec_time > HYDROGEN_UPDATE_VOICE_STATE_THRESHOLD {
+            event!(
+                Level::WARN,
+                time = ?exec_time,
+                "updating the voice state took too long"
+            );
+        } else {
+            event!(
+                Level::INFO,
+                time = ?exec_time,
+                "voice state updated"
+            );
+        }
+    }
+
+    #[instrument(skip_all, fields(guild_id = ?voice_server.guild_id.map(|v| v.get())))]
+    /// Handles the voice server update event.
+    async fn voice_server_update(&self, _ctx: Context, voice_server: VoiceServerUpdateEvent) {
+        event!(Level::DEBUG, "updating voice server...");
+        let init_time = Instant::now();
+
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_server(voice_server).await {
+                event!(Level::ERROR, error = ?e, "cannot update the voice server");
+            }
+        }
+
+        let exec_time = init_time.elapsed();
+        if exec_time > HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD {
+            event!(
+                Level::WARN,
+                time = ?exec_time,
+                "updating the voice server took too long"
+            );
+        } else {
+            event!(
+                Level::INFO,
+                time = ?exec_time,
+                "voice server updated"
+            );
         }
     }
 }

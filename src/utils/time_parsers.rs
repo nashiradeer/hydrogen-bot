@@ -1,6 +1,6 @@
 //! Time parsers used to parse different time syntaxes.
 
-use std::sync::LazyLock;
+use std::{sync::LazyLock, time::Duration};
 
 use regex::Regex;
 
@@ -11,24 +11,24 @@ static TIME_SUFFIX_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Parses the `00s`, `00m`, and `00h` syntaxes.
-pub fn suffix_syntax(data: &str) -> Option<u32> {
+pub fn suffix_syntax(data: &str) -> Option<Duration> {
     let captures = TIME_SUFFIX_REGEX.captures(data)?;
 
     if let Some(seconds) = captures.get(2) {
         // `00s` syntax.
-        let seconds = seconds.as_str().parse::<u32>().ok()?;
+        let seconds = seconds.as_str().parse::<u64>().ok()?;
 
-        Some(seconds * 1000)
+        Some(Duration::from_secs(seconds))
     } else if let Some(minutes) = captures.get(3) {
         // `00m` syntax.
-        let minutes = minutes.as_str().parse::<u32>().ok()?;
+        let minutes = minutes.as_str().parse::<u64>().ok()?;
 
-        Some(minutes * 60 * 1000)
+        Some(Duration::from_secs(minutes * 60))
     } else if let Some(hours) = captures.get(4) {
         // `00h` syntax.
-        let hours = hours.as_str().parse::<u32>().ok()?;
+        let hours = hours.as_str().parse::<u64>().ok()?;
 
-        Some(hours * 60 * 60 * 1000)
+        Some(Duration::from_secs(hours * 60 * 60))
     } else {
         None
     }
@@ -41,26 +41,26 @@ static TIME_SEMICOLON_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Parses the `00:00:00` and `00:00` syntaxes.
-pub fn semicolon_syntax(data: &str) -> Option<u32> {
+pub fn semicolon_syntax(data: &str) -> Option<Duration> {
     let captures = TIME_SEMICOLON_REGEX.captures(data)?;
 
-    let hours_minutes = match captures.get(3) {
+    let seconds = captures.get(6)?.as_str().parse::<u64>().ok()?;
+
+    let duration = Duration::from_secs(seconds);
+
+    match captures.get(3) {
         Some(x) => {
             // `00:00:00` syntax.
-            let hours = x.as_str().parse::<u32>().ok()?;
-            let minutes = captures.get(4)?.as_str().parse::<u32>().ok()?;
+            let hours = x.as_str().parse::<u64>().ok()?;
+            let minutes = captures.get(4)?.as_str().parse::<u64>().ok()?;
 
-            (hours * 60 * 60 * 1000) + (minutes * 60 * 1000)
+            Some(duration + Duration::from_secs((hours * 60 * 60) + (minutes * 60)))
         }
         None => {
             // `00:00` syntax.
-            let minutes = captures.get(5)?.as_str().parse::<u32>().ok()?;
+            let minutes = captures.get(5)?.as_str().parse::<u64>().ok()?;
 
-            minutes * 60 * 1000
+            Some(duration + Duration::from_secs(minutes * 60))
         }
-    };
-
-    let seconds = captures.get(6)?.as_str().parse::<u32>().ok()?;
-
-    Some(hours_minutes + (seconds * 1000))
+    }
 }

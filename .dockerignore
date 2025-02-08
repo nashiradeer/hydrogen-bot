@@ -2,10 +2,10 @@
 /.github
 /.vscode
 /target
-.env
+/icons
+/.devcontainer
+/dev
 .gitignore
 CHANGELOG.md
-composer.yaml
-icon.png
-LICENSE.txt
 README.md
+TODO.md
