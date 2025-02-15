@@ -1,5 +1,5 @@
 {
-  "name": "Rust over Alpine",
+  "name": "Hydrogen Dev Container",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "features": {

@@ -10,7 +10,7 @@
 - [ ] Rename seek to time.
 - [ ] Rework join to have templates for the Music Player.
 - [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
-- [ ] Update dependencies. (if needed)
+- [x] Update dependencies. (if needed)
 
 ## 0.0.1-alpha.14
 
