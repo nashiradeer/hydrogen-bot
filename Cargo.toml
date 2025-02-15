@@ -9,6 +9,10 @@ readme = "README.md"
 keywords = ["discord", "lavalink", "music"]
 publish = false
 
+[features]
+default = ["simd-json"]
+simd-json = ["songbird/simd-json", "serenity/simd_json", "dep:simd-json"]
+
 [dependencies]
 dashmap = "6.1.0"
 futures = "0.3.31"
@@ -47,8 +51,11 @@ features = [
     "utils",
     "voice",
     "rustls_backend",
-    "simd_json",
 ]
+
+[dependencies.simd-json]
+version = "0.14.3"
+optional = true
 
 [dependencies.songbird]
 version = "0.4.3"
