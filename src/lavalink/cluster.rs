@@ -89,7 +89,7 @@ impl Cluster {
                         }
                     },
                     _ = notifier.notified() => break,
-                };
+                }
             }
 
             session_id_storage.write().await.remove(&index);
