@@ -1,6 +1,6 @@
 //! # Hydrolink
 //!
-//! An [tokio](https://tokio.rs) based [Lavalink](https://lavalink.dev/) client, with support for any Discord library.
+//! A [tokio](https://tokio.rs) based [Lavalink](https://lavalink.dev/) client, with support for any Discord library.
 
 pub mod cluster;
 pub mod hydrogen;
@@ -62,7 +62,7 @@ pub enum Error {
     /// The Lavalink node is already connected.
     AlreadyConnected,
 
-    /// The response from the Lavalink server had no body.
+    /// The response from the Lavalink server doesn't have a body.
     NoResponseBody,
 }
 

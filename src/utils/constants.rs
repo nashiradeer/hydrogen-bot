@@ -36,13 +36,13 @@ pub static HYDROGEN_NAME: &str = "Hydrogen";
 /// The time in milliseconds to consider a ready event as slow.
 pub const HYDROGEN_READY_THRESHOLD: Duration = Duration::from_millis(600);
 
-/// The time in milliseconds to consider a interaction create event as slow.
+/// The time in milliseconds to consider an interaction create event as slow.
 pub const HYDROGEN_INTERACTION_CREATE_THRESHOLD: Duration = Duration::from_millis(15000);
 
-/// The time in milliseconds to consider a update voice state event as slow.
+/// The time in milliseconds to consider an update voice state event as slow.
 pub const HYDROGEN_UPDATE_VOICE_STATE_THRESHOLD: Duration = Duration::from_millis(1000);
 
-/// The time in milliseconds to consider a update voice server event as slow.
+/// The time in milliseconds to consider an update voice server event as slow.
 pub const HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD: Duration = Duration::from_millis(350);
 
 /// The time in milliseconds to consider a lavalink event as slow.

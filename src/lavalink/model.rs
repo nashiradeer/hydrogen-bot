@@ -195,7 +195,7 @@ pub struct Stats {
     pub memory: Memory,
     /// The cpu stats of the node.
     pub cpu: CPU,
-    /// The frame stats of the node. [Option::None] if the node has no players or when retrieved via `/v4/stats`.
+    /// The frame stats of the node. [None] if the node has no players or when retrieved via `/v4/stats`.
     pub frame_stats: Option<FrameStats>,
 }
 
@@ -1770,7 +1770,7 @@ pub struct BalancingIpRoutePlanner {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type", content = "size")]
-/// Represents a IP block with size and type.
+/// Represents an IP block with size and type.
 pub enum IPBlock {
     #[serde(rename = "Inet4Address")]
     /// The ipv4 block type.
