@@ -32,7 +32,8 @@ mod commands;
 mod components;
 mod handler;
 mod i18n;
-pub mod lavalink;
+#[allow(dead_code)]
+mod lavalink;
 mod music;
 mod utils;
 
