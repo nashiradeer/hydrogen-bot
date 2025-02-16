@@ -3,12 +3,11 @@
 use std::time::Duration;
 
 use super::{model::*, Error, LavalinkResult, Result, LAVALINK_USER_AGENT};
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use tokio_tungstenite::tungstenite::Bytes;
 use url::Url;
 
 #[derive(Debug, Clone)]
