@@ -3,21 +3,25 @@
 use std::time::Duration;
 
 use super::{model::*, Error, LavalinkResult, Result, LAVALINK_USER_AGENT};
-use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
+use bytes::BytesMut;
+use futures::StreamExt;
+use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use reqwest::Client;
+use tokio_tungstenite::tungstenite::Bytes;
+use url::Url;
 
 #[derive(Debug, Clone)]
 /// REST client for Lavalink.
 pub struct Rest {
-    /// The HTTP client.
+    /// The HTTP client with headers required for Lavalink.
     client: Client,
-    /// The host of the Lavalink server.
-    host: String,
-    /// Whether to use TLS.
-    tls: bool,
-    /// The password for the Lavalink server.
+    /// The password for the Lavalink REST API, this is here for resuming sessions.
     password: String,
-    /// Whether to enable stack traces.
+    /// The HTTP URL used to construct the URLs for the requests to the Lavalink REST API.
+    http_url: Url,
+    /// WebSocket URI used to connect to the Lavalink WebSocket.
+    websocket_uri: Uri,
+    /// Enables stack traces in all Lavalink REST API requests.
     pub trace: bool,
 }
 
@@ -36,11 +40,25 @@ impl Rest {
             .build()
             .map_err(Error::from)?;
 
+        let http_url = Url::parse(&format!(
+            "{}://{}",
+            if tls { "https" } else { "http" },
+            host
+        ))
+        .map_err(Error::from)?;
+
+        let websocket_uri = Uri::builder()
+            .scheme(if tls { "wss" } else { "ws" })
+            .authority(host)
+            .path_and_query("/v4/websocket")
+            .build()
+            .map_err(Error::from)?;
+
         Ok(Self {
             client,
-            host: host.to_owned(),
             password: password.to_owned(),
-            tls,
+            http_url,
+            websocket_uri,
             trace: false,
         })
     }
@@ -50,14 +68,14 @@ impl Rest {
         &self.client
     }
 
-    /// Get the host of the Lavalink server.
-    pub fn host(&self) -> &str {
-        &self.host
+    /// Get the HTTP URL.
+    pub fn http_url(&self) -> &Url {
+        &self.http_url
     }
 
-    /// Get whether to use TLS.
-    pub fn tls(&self) -> bool {
-        self.tls
+    /// Get the WebSocket URI.
+    pub fn websocket_uri(&self) -> &Uri {
+        &self.websocket_uri
     }
 
     /// Get the password for the Lavalink server.
@@ -66,41 +84,44 @@ impl Rest {
     }
 
     /// Build a URL from a path.
-    pub fn build_url(&self, path: &str) -> String {
-        format!(
-            "{}://{}{}",
-            if self.tls { "https" } else { "http" },
-            self.host,
-            path
-        )
+    pub fn build_url(&self, path: &str) -> Result<Url> {
+        self.http_url.join(path).map_err(Error::from)
+    }
+
+    /// Build a URL from a path and query.
+    pub fn build_url_with_query(&self, path: &str, query: &str) -> Result<Url> {
+        let mut url = self.build_url(path)?;
+        url.set_query(Some(query));
+        Ok(url)
     }
 
     #[cfg(feature = "simd-json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "simd-json")))]
-    /// Serialize a value to JSON using the selected JSON library.
-    pub fn serialize<T: serde::Serialize + ?Sized>(&self, value: &T) -> Result<Vec<u8>> {
+    /// Serialize the request in JSON using the selected JSON library.
+    pub fn serialize_request<T: serde::Serialize + ?Sized>(&self, value: &T) -> Result<Vec<u8>> {
         simd_json::to_vec(value).map_err(Error::from)
     }
 
     #[cfg(not(feature = "simd-json"))]
     #[cfg_attr(docsrs, doc(cfg(not(feature = "simd-json"))))]
-    /// Serialize a value to JSON using the selected JSON library.
-    pub fn serialize<T: serde::Serialize + ?Sized>(&self, value: &T) -> Result<Vec<u8>> {
+    /// Serialize the request in JSON using the selected JSON library.
+    pub fn serialize_request<T: serde::Serialize + ?Sized>(&self, value: &T) -> Result<Vec<u8>> {
         serde_json::to_vec(value).map_err(Error::from)
     }
 
     #[cfg(feature = "simd-json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "simd-json")))]
-    /// Deserialize a value from JSON using the selected JSON library.
-    pub fn deserialize<T: serde::de::DeserializeOwned>(&self, value: &mut [u8]) -> Result<T> {
-        simd_json::from_slice(value).map_err(Error::from)
+    /// Deserialize the response in JSON using the selected JSON library.
+    pub fn deserialize_response<T: serde::de::DeserializeOwned>(&self, value: Bytes) -> Result<T> {
+        let mut value_mutable = value.try_into_mut().unwrap_or_else(|e| BytesMut::from(e));
+        simd_json::from_slice(value_mutable.as_mut()).map_err(Error::from)
     }
 
     #[cfg(not(feature = "simd-json"))]
     #[cfg_attr(docsrs, doc(cfg(not(feature = "simd-json"))))]
-    /// Deserialize a value from JSON using the selected JSON library.
-    pub fn deserialize<T: serde::de::DeserializeOwned>(&self, value: &mut [u8]) -> Result<T> {
-        serde_json::from_slice(value).map_err(Error::from)
+    /// Deserialize the response in JSON using the selected JSON library.
+    pub fn deserialize_response<T: serde::de::DeserializeOwned>(&self, value: Bytes) -> Result<T> {
+        serde_json::from_slice(value.as_ref()).map_err(Error::from)
     }
 
     /// Parse a response from the Lavalink server.
@@ -112,28 +133,24 @@ impl Rest {
         {
             Ok(None)
         } else {
-            let response_body = response.bytes().await.map_err(Error::from)?;
-
-            Into::<Result<T>>::into(
-                self.deserialize::<LavalinkResult<T>>(
-                    response_body.try_into_mut().unwrap().as_mut(),
-                )?,
-            )
+            Into::<Result<T>>::into(self.deserialize_response::<LavalinkResult<T>>(
+                response.bytes().await.map_err(Error::from)?,
+            )?)
             .map(Some)
         }
     }
 
-    /// Fetch a value from the Lavalink server.
-    pub async fn fetch<I: serde::Serialize + ?Sized, O: serde::de::DeserializeOwned>(
+    /// Call the Lavalink REST API with a request body and a response body.
+    pub async fn call_req_res<I: serde::Serialize + ?Sized, O: serde::de::DeserializeOwned>(
         &self,
         method: Method,
-        path: &str,
+        url: Url,
         input: &I,
     ) -> Result<Option<O>> {
         let response = self
             .client
-            .request(method, &self.build_url(path))
-            .body(self.serialize(input)?)
+            .request(method, url)
+            .body(self.serialize_request(input)?)
             .send()
             .await
             .map_err(Error::from)?;
@@ -141,16 +158,18 @@ impl Rest {
         self.parse_response(response).await
     }
 
-    /// Fetch a value from the Lavalink server with body in the request, but without response body.
-    pub async fn fetch_only_input<I: serde::Serialize>(
+    /// Call the Lavalink REST API with a request body, but without a response body.
+    ///
+    /// All errors status codes (4xx and 5xx) will be returned as an error.
+    pub async fn call_req<I: serde::Serialize>(
         &self,
         method: Method,
-        path: &str,
+        url: Url,
         input: &I,
     ) -> Result<()> {
         self.client
-            .request(method, &self.build_url(path))
-            .body(self.serialize(input)?)
+            .request(method, url)
+            .body(self.serialize_request(input)?)
             .send()
             .await
             .map_err(Error::from)?
@@ -159,22 +178,15 @@ impl Rest {
             .map_err(Error::from)
     }
 
-    /// Fetch a value from the Lavalink server without body in the request.
-    pub async fn fetch_only_output<O: serde::de::DeserializeOwned>(
+    /// Call the Lavalink REST API without a request body, but with a response body.
+    pub async fn call_res<O: serde::de::DeserializeOwned>(
         &self,
         method: Method,
-        path: &str,
+        url: Url,
     ) -> Result<Option<O>> {
-        let url = format!(
-            "{}://{}{}",
-            if self.tls { "https" } else { "http" },
-            self.host,
-            path
-        );
-
         let response = self
             .client
-            .request(method, &url)
+            .request(method, url)
             .send()
             .await
             .map_err(Error::from)?;
@@ -182,17 +194,12 @@ impl Rest {
         self.parse_response(response).await
     }
 
-    /// Fetch a value from the Lavalink server without body in the request or in the response.
-    pub async fn fetch_empty(&self, method: Method, path: &str) -> Result<()> {
-        let url = format!(
-            "{}://{}{}",
-            if self.tls { "https" } else { "http" },
-            self.host,
-            path,
-        );
-
+    /// Call the Lavalink REST API without a request body and without a response body.\
+    ///
+    /// All errors status codes (4xx and 5xx) will be returned as an error.
+    pub async fn call(&self, method: Method, url: Url) -> Result<()> {
         self.client
-            .request(method, &url)
+            .request(method, url)
             .send()
             .await
             .map_err(Error::from)?
@@ -203,12 +210,12 @@ impl Rest {
 
     /// Load a track from an identifier.
     pub async fn load_track(&self, identifier: &str) -> Result<LoadResult> {
-        self.fetch_only_output(
+        self.call_res(
             Method::GET,
-            &format!(
-                "/v4/loadtracks?identifier={}&trace={}",
-                identifier, self.trace
-            ),
+            self.build_url_with_query(
+                "/v4/loadtracks",
+                &format!("identifier={}&trace={}", identifier, self.trace),
+            )?,
         )
         .await
         .transpose()
@@ -217,12 +224,12 @@ impl Rest {
 
     /// Decode a base64 track.
     pub async fn decode_track(&self, encoded_track: &str) -> Result<Track> {
-        self.fetch_only_output(
+        self.call_res(
             Method::GET,
-            &format!(
-                "/v4/decodetrack?encodedTrack={}&trace={}",
-                encoded_track, self.trace
-            ),
+            self.build_url_with_query(
+                "/v4/decodetrack",
+                &format!("encodedTrack={}&trace={}", encoded_track, self.trace),
+            )?,
         )
         .await
         .transpose()
@@ -231,9 +238,9 @@ impl Rest {
 
     /// Decode multiple base64 tracks.
     pub async fn decode_tracks(&self, encoded_tracks: &[&str]) -> Result<Vec<Track>> {
-        self.fetch(
+        self.call_req_res(
             Method::POST,
-            &format!("/v4/decodetracks?trace={}", self.trace),
+            self.build_url_with_query("/v4/decodetracks", &format!("trace={}", self.trace))?,
             encoded_tracks,
         )
         .await
@@ -243,9 +250,12 @@ impl Rest {
 
     /// Get all players in the session.
     pub async fn get_players(&self, session_id: &str) -> Result<Vec<Player>> {
-        self.fetch_only_output(
+        self.call_res(
             Method::GET,
-            &format!("/v4/sessions/{}/players?trace={}", session_id, self.trace),
+            self.build_url_with_query(
+                &format!("/v4/sessions/{}/players", session_id),
+                &format!("trace={}", self.trace),
+            )?,
         )
         .await
         .transpose()
@@ -254,12 +264,12 @@ impl Rest {
 
     /// Get the player in the session.
     pub async fn get_player(&self, session_id: &str, guild_id: &str) -> Result<Option<Player>> {
-        self.fetch_only_output(
+        self.call_res(
             Method::GET,
-            &format!(
-                "/v4/sessions/{}/players/{}?trace={}",
-                session_id, guild_id, self.trace
-            ),
+            self.build_url_with_query(
+                &format!("/v4/sessions/{}/players/{}", session_id, guild_id),
+                &format!("trace={}", self.trace),
+            )?,
         )
         .await
     }
@@ -272,12 +282,12 @@ impl Rest {
         player: &UpdatePlayer,
         no_replace: bool,
     ) -> Result<Player> {
-        self.fetch(
+        self.call_req_res(
             Method::PATCH,
-            &format!(
-                "/v4/sessions/{}/players/{}?noReplace={}&trace={}",
-                session_id, guild_id, no_replace, self.trace
-            ),
+            self.build_url_with_query(
+                &format!("/v4/sessions/{}/players/{}", session_id, guild_id),
+                &format!("noReplace={}&trace={}", no_replace, self.trace),
+            )?,
             player,
         )
         .await
@@ -287,12 +297,12 @@ impl Rest {
 
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, session_id: &str, guild_id: &str) -> Result<()> {
-        self.fetch_empty(
+        self.call(
             Method::DELETE,
-            &format!(
-                "/v4/sessions/{}/players/{}?trace={}",
-                session_id, guild_id, self.trace
-            ),
+            self.build_url_with_query(
+                &format!("/v4/sessions/{}/players/{}", session_id, guild_id),
+                &format!("trace={}", self.trace),
+            )?,
         )
         .await
     }
@@ -303,9 +313,12 @@ impl Rest {
         session_id: &str,
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
-        self.fetch(
+        self.call_req_res(
             Method::PATCH,
-            &format!("/v4/sessions/{}?trace={}", session_id, self.trace),
+            self.build_url_with_query(
+                &format!("/v4/sessions/{}", session_id),
+                &format!("trace={}", self.trace),
+            )?,
             session,
         )
         .await
@@ -315,16 +328,19 @@ impl Rest {
 
     /// Get information about the Lavalink server.
     pub async fn info(&self) -> Result<Info> {
-        self.fetch_only_output(Method::GET, &format!("/v4/info?trace={}", self.trace))
-            .await
-            .transpose()
-            .unwrap_or(Err(Error::NoResponseBody))
+        self.call_res(
+            Method::GET,
+            self.build_url_with_query("/v4/info", &format!("trace={}", self.trace))?,
+        )
+        .await
+        .transpose()
+        .unwrap_or(Err(Error::NoResponseBody))
     }
 
     /// Get the Lavalink version.
     pub async fn version(&self) -> Result<String> {
         self.client
-            .get(self.build_url("/version"))
+            .get(self.build_url("/version")?)
             .send()
             .await
             .map_err(Error::from)?
@@ -335,18 +351,21 @@ impl Rest {
 
     /// Get the status of the Route Planner.
     pub async fn routeplanner_status(&self) -> Result<Option<RoutePlanner>> {
-        self.fetch_only_output(
+        self.call_res(
             Method::GET,
-            &format!("/v4/routeplanner/status?trace={}", self.trace),
+            self.build_url_with_query("/v4/routeplanner/status", &format!("trace={}", self.trace))?,
         )
         .await
     }
 
     /// Unmark a failed address in the Route Planner.
     pub async fn routeplanner_unmark(&self, address: &str) -> Result<()> {
-        self.fetch_only_input(
+        self.call_req(
             Method::POST,
-            &format!("/v4/routeplanner/free/address?trace={}", self.trace),
+            self.build_url_with_query(
+                "/v4/routeplanner/free/address",
+                &format!("trace={}", self.trace),
+            )?,
             &UnmarkRoutePlanner {
                 address: address.to_owned(),
             },
@@ -356,9 +375,12 @@ impl Rest {
 
     /// Unmark all failed addresses in the Route Planner.
     pub async fn routeplanner_unmark_all(&self) -> Result<()> {
-        self.fetch_empty(
+        self.call(
             Method::POST,
-            &format!("/v4/routeplanner/free/all?trace={}", self.trace),
+            self.build_url_with_query(
+                "/v4/routeplanner/free/all",
+                &format!("trace={}", self.trace),
+            )?,
         )
         .await
     }

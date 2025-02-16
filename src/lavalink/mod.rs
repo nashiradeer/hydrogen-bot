@@ -50,6 +50,8 @@ pub enum Error {
     /// An error from [`tokio_tungstenite`].
     Tungstenite(tokio_tungstenite::tungstenite::Error),
 
+    UrlParse(url::ParseError),
+
     /// No session ID was provided.
     NoSessionId,
 
@@ -69,17 +71,19 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Reqwest(e) => write!(f, "Reqwest error: {}", e),
+            Self::Reqwest(e) => e.fmt(f),
 
-            Self::Serde(e) => write!(f, "Serde error: {}", e),
+            Self::Serde(e) => e.fmt(f),
 
-            Self::Lavalink(e) => write!(f, "Lavalink error: {:?}", e),
+            Self::Lavalink(e) => write!(f, "Lavalink REST error: {}", e.message),
 
-            Self::Http(e) => write!(f, "HTTP error: {}", e),
+            Self::Http(e) => e.fmt(f),
 
-            Self::Tungstenite(e) => write!(f, "Tungstenite error: {}", e),
+            Self::Tungstenite(e) => e.fmt(f),
 
-            Self::InvalidHeaderValue(e) => write!(f, "Invalid header value: {}", e),
+            Self::InvalidHeaderValue(e) => e.fmt(f),
+
+            Self::UrlParse(e) => e.fmt(f),
 
             Self::NoSessionId => write!(f, "No session ID was provided"),
 
@@ -90,7 +94,7 @@ impl std::fmt::Display for Error {
             Self::NoResponseBody => write!(f, "Lavalink response had no body"),
 
             #[cfg(feature = "simd-json")]
-            Self::SimdJson(e) => write!(f, "SimdJson error: {}", e),
+            Self::SimdJson(e) => e.fmt(f),
         }
     }
 }
@@ -122,6 +126,12 @@ impl From<http::Error> for Error {
 impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(e: tokio_tungstenite::tungstenite::Error) -> Self {
         Self::Tungstenite(e)
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(e: url::ParseError) -> Self {
+        Self::UrlParse(e)
     }
 }
 

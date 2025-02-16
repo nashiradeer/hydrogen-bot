@@ -35,24 +35,13 @@ impl Lavalink {
 
     /// Connect to a Lavalink server.
     pub async fn connect_from(rest: Rest, user_id: &str) -> Result<Self> {
-        Ok(Self::new(
-            connect(rest.host(), rest.password(), rest.tls(), user_id).await?,
-            rest,
-            user_id,
-        ))
+        Ok(Self::new(connect(&rest, user_id).await?, rest, user_id))
     }
 
     /// Reconnect to a Lavalink server, resuming a previous session.
     pub async fn resume_from(rest: Rest, user_id: &str, session_id: &str) -> Result<Self> {
         Ok(Self::new(
-            resume_session(
-                rest.host(),
-                rest.password(),
-                rest.tls(),
-                user_id,
-                session_id,
-            )
-            .await?,
+            resume_session(&rest, user_id, session_id).await?,
             rest,
             user_id,
         ))
@@ -62,8 +51,7 @@ impl Lavalink {
     ///
     /// WARNING: This method locks the internal connection mutex.
     pub async fn connect(&self) -> Result<()> {
-        *self.connection.lock().await =
-            connect(self.host(), self.password(), self.tls(), &self.user_id).await?;
+        *self.connection.lock().await = connect(self, &self.user_id).await?;
 
         Ok(())
     }
@@ -73,9 +61,7 @@ impl Lavalink {
     /// WARNING: This method locks the internal connection mutex.
     pub async fn resume(&self) -> Result<()> {
         *self.connection.lock().await = resume_session(
-            self.host(),
-            self.password(),
-            self.tls(),
+            self,
             &self.user_id,
             self.session_id().as_ref().ok_or(Error::NoSessionId)?,
         )

@@ -67,8 +67,7 @@ impl Cluster {
         let notifier = self.notifier.clone();
         let node = &self.nodes[index];
         let session_id_storage = self.session_id.clone();
-        let mut connection =
-            connect(node.host(), node.password(), node.tls(), &self.user_id).await?;
+        let mut connection = connect(node, &self.user_id).await?;
 
         tokio::spawn(async move {
             loop {
