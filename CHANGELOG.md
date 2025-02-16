@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add simd-json support on the Lavalink REST client.
+
 ### Fixed
 
 - Typo in Severity enum (Suspicous -> Suspicious).
@@ -11,7 +15,11 @@
 
 - Add Spotify as the default search provider.
 - Avoid recalculations on pause component.
+- Avoid RwLock and Mutex from tokio when possible in Hydrolink.
+- Change how the Lavalink REST client makes requests.
+- Use parking_lot in Hydrolink instead of std.
 - Update dependencies.
+- Update to Rust 1.84.1.
 
 ### Removed
 
@@ -40,7 +48,7 @@
 ### Fixed
 
 - Wrong play command message for playing = true and count >
-  1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+    1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 
 ### Removed
 
