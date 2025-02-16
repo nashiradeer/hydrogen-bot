@@ -1,4 +1,3 @@
-use http::Uri;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{ClientRequestBuilder, Message as WsMessage, Result as WsResult},
