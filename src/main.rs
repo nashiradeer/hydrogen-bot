@@ -200,30 +200,30 @@ impl EventHandler for HydrogenHandler {
         }
     }
 
-    #[instrument(skip_all, fields(interaction.id = %interaction.id(), interaction.kind = ?interaction.kind()))]
-    /// Handles the interaction create event.
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        event!(Level::DEBUG, "handling interaction...");
+    #[instrument(skip_all, fields(guild_id = ?voice_server.guild_id.map(|v| v.get())))]
+    /// Handles the voice server update event.
+    async fn voice_server_update(&self, _ctx: Context, voice_server: VoiceServerUpdateEvent) {
+        event!(Level::DEBUG, "updating voice server...");
         let init_time = Instant::now();
 
-        match interaction {
-            Interaction::Command(command) => handle_command(&ctx, &command).await,
-            Interaction::Component(component) => handle_component(&ctx, &component).await,
-            _ => (),
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_server(voice_server).await {
+                event!(Level::ERROR, error = ?e, "cannot update the voice server");
+            }
         }
 
         let exec_time = init_time.elapsed();
-        if exec_time > utils::constants::HYDROGEN_INTERACTION_CREATE_THRESHOLD {
+        if exec_time > HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD {
             event!(
                 Level::WARN,
                 time = ?exec_time,
-                "handling the interaction took too long"
+                "updating the voice server took too long"
             );
         } else {
             event!(
                 Level::INFO,
                 time = ?exec_time,
-                "interaction handled"
+                "voice server updated"
             );
         }
     }
@@ -256,30 +256,30 @@ impl EventHandler for HydrogenHandler {
         }
     }
 
-    #[instrument(skip_all, fields(guild_id = ?voice_server.guild_id.map(|v| v.get())))]
-    /// Handles the voice server update event.
-    async fn voice_server_update(&self, _ctx: Context, voice_server: VoiceServerUpdateEvent) {
-        event!(Level::DEBUG, "updating voice server...");
+    #[instrument(skip_all, fields(interaction.id = %interaction.id(), interaction.kind = ?interaction.kind()))]
+    /// Handles the interaction create event.
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        event!(Level::DEBUG, "handling interaction...");
         let init_time = Instant::now();
 
-        if let Some(manager) = PLAYER_MANAGER.get() {
-            if let Err(e) = manager.update_voice_server(voice_server).await {
-                event!(Level::ERROR, error = ?e, "cannot update the voice server");
-            }
+        match interaction {
+            Interaction::Command(command) => handle_command(&ctx, &command).await,
+            Interaction::Component(component) => handle_component(&ctx, &component).await,
+            _ => (),
         }
 
         let exec_time = init_time.elapsed();
-        if exec_time > HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD {
+        if exec_time > utils::constants::HYDROGEN_INTERACTION_CREATE_THRESHOLD {
             event!(
                 Level::WARN,
                 time = ?exec_time,
-                "updating the voice server took too long"
+                "handling the interaction took too long"
             );
         } else {
             event!(
                 Level::INFO,
                 time = ?exec_time,
-                "voice server updated"
+                "interaction handled"
             );
         }
     }
