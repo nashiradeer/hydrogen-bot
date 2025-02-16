@@ -174,7 +174,7 @@ impl Cluster {
         &self,
         index: usize,
         guild_id: &str,
-        player: UpdatePlayer,
+        player: &UpdatePlayer,
         no_replace: bool,
     ) -> Result<Player> {
         let session_id = self.session_id(index).await.ok_or(Error::NoSessionId)?;

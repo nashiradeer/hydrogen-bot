@@ -117,7 +117,7 @@ impl Lavalink {
     pub async fn update_player(
         &self,
         guild_id: &str,
-        player: UpdatePlayer,
+        player: &UpdatePlayer,
         no_replace: bool,
     ) -> Result<Player> {
         let session_id = self.session_id().ok_or(Error::NoSessionId)?;
