@@ -112,7 +112,7 @@ impl Rest {
     #[cfg_attr(docsrs, doc(cfg(feature = "simd-json")))]
     /// Deserialize the response in JSON using the selected JSON library.
     pub fn deserialize_response<T: DeserializeOwned>(&self, value: Bytes) -> Result<T> {
-        let mut value_mutable = value.try_into_mut().unwrap_or_else(|e| BytesMut::from(e));
+        let mut value_mutable = value.try_into_mut().unwrap_or_else(BytesMut::from);
         simd_json::from_slice(value_mutable.as_mut()).map_err(Error::from)
     }
 

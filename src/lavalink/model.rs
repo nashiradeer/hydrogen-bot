@@ -60,7 +60,7 @@ impl Message {
     }
 
     /// Convert the message to ready.
-    pub fn to_ready(self) -> Option<Ready> {
+    pub fn into_ready(self) -> Option<Ready> {
         match self {
             Message::Ready(ready) => Some(ready),
             _ => None,
@@ -68,7 +68,7 @@ impl Message {
     }
 
     /// Convert the message to player update.
-    pub fn to_player_update(self) -> Option<PlayerUpdate> {
+    pub fn into_player_update(self) -> Option<PlayerUpdate> {
         match self {
             Message::PlayerUpdate(player_update) => Some(player_update),
             _ => None,
@@ -76,7 +76,7 @@ impl Message {
     }
 
     /// Convert the message to stats.
-    pub fn to_stats(self) -> Option<Stats> {
+    pub fn into_stats(self) -> Option<Stats> {
         match self {
             Message::Stats(stats) => Some(stats),
             _ => None,
@@ -84,7 +84,7 @@ impl Message {
     }
 
     /// Convert the message to event.
-    pub fn to_event(self) -> Option<Event> {
+    pub fn into_event(self) -> Option<Event> {
         match self {
             Message::Event(event) => Some(*event),
             _ => None,
@@ -194,7 +194,7 @@ pub struct Stats {
     /// The memory stats of the node.
     pub memory: Memory,
     /// The cpu stats of the node.
-    pub cpu: CPU,
+    pub cpu: Cpu,
     /// The frame stats of the node. [None] if the node has no players or when retrieved via `/v4/stats`.
     pub frame_stats: Option<FrameStats>,
 }
@@ -230,7 +230,7 @@ pub struct Memory {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// CPU statistics of the Lavalink node.
-pub struct CPU {
+pub struct Cpu {
     /// The amount of cores the node has.
     pub cores: u16,
     /// The system load of the node.
@@ -336,7 +336,7 @@ impl Event {
     }
 
     /// Convert the event to track start.
-    pub fn to_track_start(self) -> Option<TrackStartEvent> {
+    pub fn into_track_start(self) -> Option<TrackStartEvent> {
         match self {
             Event::TrackStart(track_start) => Some(track_start),
             _ => None,
@@ -344,7 +344,7 @@ impl Event {
     }
 
     /// Convert the event to track end.
-    pub fn to_track_end(self) -> Option<TrackEndEvent> {
+    pub fn into_track_end(self) -> Option<TrackEndEvent> {
         match self {
             Event::TrackEnd(track_end) => Some(track_end),
             _ => None,
@@ -352,7 +352,7 @@ impl Event {
     }
 
     /// Convert the event to track exception.
-    pub fn to_track_exception(self) -> Option<TrackExceptionEvent> {
+    pub fn into_track_exception(self) -> Option<TrackExceptionEvent> {
         match self {
             Event::TrackException(track_exception) => Some(track_exception),
             _ => None,
@@ -360,7 +360,7 @@ impl Event {
     }
 
     /// Convert the event to track stuck.
-    pub fn to_track_stuck(self) -> Option<TrackStuckEvent> {
+    pub fn into_track_stuck(self) -> Option<TrackStuckEvent> {
         match self {
             Event::TrackStuck(track_stuck) => Some(track_stuck),
             _ => None,
@@ -368,7 +368,7 @@ impl Event {
     }
 
     /// Convert the event to websocket closed.
-    pub fn to_websocket_closed(self) -> Option<WebSocketClosedEvent> {
+    pub fn into_websocket_closed(self) -> Option<WebSocketClosedEvent> {
         match self {
             Event::WebSocketClosed(websocket_closed) => Some(websocket_closed),
             _ => None,
@@ -722,7 +722,7 @@ impl LoadResult {
     }
 
     /// Convert the result to a track.
-    pub fn to_track(self) -> Option<Track> {
+    pub fn into_track(self) -> Option<Track> {
         match self {
             LoadResult::Track(track) => Some(*track),
             _ => None,
@@ -730,7 +730,7 @@ impl LoadResult {
     }
 
     /// Convert the result to a playlist.
-    pub fn to_playlist(self) -> Option<LoadResultPlaylist> {
+    pub fn into_playlist(self) -> Option<LoadResultPlaylist> {
         match self {
             LoadResult::Playlist(playlist) => Some(playlist),
             _ => None,
@@ -738,7 +738,7 @@ impl LoadResult {
     }
 
     /// Convert the result to a search.
-    pub fn to_search(self) -> Option<Vec<Track>> {
+    pub fn into_search(self) -> Option<Vec<Track>> {
         match self {
             LoadResult::Search(tracks) => Some(tracks),
             _ => None,
@@ -746,7 +746,7 @@ impl LoadResult {
     }
 
     /// Convert the result to an error.
-    pub fn to_error(self) -> Option<Exception> {
+    pub fn into_error(self) -> Option<Exception> {
         match self {
             LoadResult::Error(exception) => Some(exception),
             _ => None,
@@ -1615,7 +1615,7 @@ impl RoutePlanner {
     }
 
     /// Convert the route planner to rotating.
-    pub fn to_rotating(self) -> Option<RotatingIpRoutePlanner> {
+    pub fn into_rotating(self) -> Option<RotatingIpRoutePlanner> {
         match self {
             RoutePlanner::Rotating(rotating) => Some(rotating),
             _ => None,
@@ -1623,7 +1623,7 @@ impl RoutePlanner {
     }
 
     /// Convert the route planner to nano.
-    pub fn to_nano(self) -> Option<NanoIpRoutePlanner> {
+    pub fn into_nano(self) -> Option<NanoIpRoutePlanner> {
         match self {
             RoutePlanner::Nano(nano) => Some(nano),
             _ => None,
@@ -1631,7 +1631,7 @@ impl RoutePlanner {
     }
 
     /// Convert the route planner to rotating nano.
-    pub fn to_rotating_nano(self) -> Option<RotatingNanoIpRoutePlanner> {
+    pub fn into_rotating_nano(self) -> Option<RotatingNanoIpRoutePlanner> {
         match self {
             RoutePlanner::RotatingNano(rotating_nano) => Some(rotating_nano),
             _ => None,
@@ -1639,7 +1639,7 @@ impl RoutePlanner {
     }
 
     /// Convert the route planner to balancing.
-    pub fn to_balancing(self) -> Option<BalancingIpRoutePlanner> {
+    pub fn into_balancing(self) -> Option<BalancingIpRoutePlanner> {
         match self {
             RoutePlanner::Balancing(balancing) => Some(balancing),
             _ => None,
