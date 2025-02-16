@@ -125,7 +125,6 @@ impl PlayerManager {
         let node_id = self
             .lavalink
             .search_connected_node()
-            .await
             .ok_or(Error::NoAvailableLavalink)?;
 
         self.players
