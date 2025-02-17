@@ -2,14 +2,18 @@
 
 ## 0.0.1-alpha.13
 
-- [ ] Create a feature for Lavalink can use simd-json instead of serde_json.
+- [x] Create a feature for Lavalink can use simd-json instead of serde_json.
 - [ ] Migrate to `dynfmt` crate instead of a lot of `String::replace`.
 - [ ] Migrate to responses using plain text instead of embeds.
-- [ ] Delete Player Message when there is no player in the guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
+- [ ] Delete Player Message when there is no player in the
+  guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
 - [ ] Rework seek to show current time and total time when no arguments are provided.
 - [ ] Rename seek to time.
 - [ ] Rework join to have templates for the Music Player.
 - [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
+- [ ] Remove PlayTogether from the Music Player.
+- [ ] Filter Lavalink's Stats and PlayerUpdate messages from logs.
+- [ ] Use songbird ConnectionInfo instead of store VoiceState.
 - [x] Update dependencies. (if needed)
 
 ## 0.0.1-alpha.14
@@ -22,7 +26,7 @@
 - [ ] Create a command to set Music Player language.
 - [ ] Update dependencies. (if needed)
 
-# 0.0.1-alpha.15
+## 0.0.1-alpha.15
 
 - [ ] Create the queue component.
 - [ ] Create the queue-next component.

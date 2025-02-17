@@ -91,7 +91,7 @@ pub async fn update_message(
             }
         }
 
-        match channel_id
+        return match channel_id
             .send_message(
                 &manager,
                 CreateMessage::new().add_embed(embed).components(components),
@@ -105,7 +105,7 @@ pub async fn update_message(
                     guild_id = ?guild_id,
                     "player message sent"
                 );
-                return (Some(channel_id), Some(message.id));
+                (Some(channel_id), Some(message.id))
             }
             Err(e) => {
                 event!(
@@ -115,9 +115,9 @@ pub async fn update_message(
                     guild_id = ?guild_id,
                     "cannot send player message"
                 );
-                return (None, None);
+                (None, None)
             }
-        }
+        };
     }
 
     (player.text_channel, player.message_id)

@@ -188,8 +188,8 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
     );
     if let Some(track) = result.track {
         if result.playing && result.count == 1 {
-            if let Some(url) = track.url {
-                return t_vars(
+            return if let Some(url) = track.url {
+                t_vars(
                     &interaction.locale,
                     "play.play_single_url",
                     [
@@ -197,17 +197,17 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                         ("author", track.author),
                         ("url", url),
                     ],
-                );
+                )
             } else {
-                return t_vars(
+                t_vars(
                     &interaction.locale,
                     "play.play_single",
                     [("name", track.title), ("author", track.author)],
-                );
-            }
+                )
+            };
         } else if result.count == 1 {
-            if let Some(url) = track.url {
-                return t_vars(
+            return if let Some(url) = track.url {
+                t_vars(
                     &interaction.locale,
                     "play.enqueue_single_url",
                     [
@@ -215,18 +215,18 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                         ("author", track.author),
                         ("url", url),
                     ],
-                );
+                )
             } else {
-                return t_vars(
+                t_vars(
                     &interaction.locale,
                     "play.enqueue_single",
                     [("name", track.title), ("author", track.author)],
-                );
-            }
+                )
+            };
         } else if result.playing {
-            if !result.truncated {
+            return if !result.truncated {
                 if let Some(url) = track.url {
-                    return t_vars(
+                    t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
                         [
@@ -235,9 +235,9 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                             ("url", url),
                             ("count", result.count.to_string()),
                         ],
-                    );
+                    )
                 } else {
-                    return t_vars(
+                    t_vars(
                         &interaction.locale,
                         "play.play_multi",
                         [
@@ -245,10 +245,10 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                             ("author", track.author),
                             ("count", result.count.to_string()),
                         ],
-                    );
+                    )
                 }
             } else if let Some(url) = track.url {
-                return format!(
+                format!(
                     "{}\n\n{}",
                     t(&interaction.locale, "play.truncated_warn"),
                     t_vars(
@@ -261,9 +261,9 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                             ("count", result.count.to_string()),
                         ]
                     ),
-                );
+                )
             } else {
-                return format!(
+                format!(
                     "{}\n\n{}",
                     t(&interaction.locale, "play.truncated_warn"),
                     t_vars(
@@ -275,8 +275,8 @@ fn generate_message(result: PlayResult, interaction: &CommandInteraction) -> Str
                             ("count", result.count.to_string()),
                         ]
                     ),
-                );
-            }
+                )
+            };
         }
     }
 

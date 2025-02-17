@@ -125,7 +125,6 @@ impl PlayerManager {
         let node_id = self
             .lavalink
             .search_connected_node()
-            .await
             .ok_or(Error::NoAvailableLavalink)?;
 
         self.players
@@ -416,7 +415,7 @@ impl PlayerManager {
 
         let player = self
             .lavalink
-            .update_player(node_id, &guild_id.to_string(), update_player, true)
+            .update_player(node_id, &guild_id.to_string(), &update_player, true)
             .await
             .map_err(Error::from)?;
 
@@ -457,7 +456,7 @@ impl PlayerManager {
             .update_player(
                 player_state.node_id,
                 &guild_id.to_string(),
-                update_player,
+                &update_player,
                 true,
             )
             .await
@@ -542,7 +541,7 @@ impl PlayerManager {
             .set_paused(paused);
 
             self.lavalink
-                .update_player(node_id, &guild_id.to_string(), update_player, false)
+                .update_player(node_id, &guild_id.to_string(), &update_player, false)
                 .await
                 .map_err(Error::from)?;
 
@@ -599,7 +598,7 @@ impl PlayerManager {
                         .update_player(
                             player_state.node_id,
                             &guild_id.to_string(),
-                            update_player,
+                            &update_player,
                             true,
                         )
                         .await?;
@@ -705,7 +704,7 @@ impl PlayerManager {
                     .update_player(
                         player_state.node_id,
                         &guild_id.to_string(),
-                        update_player,
+                        &update_player,
                         true,
                     )
                     .await?;
@@ -796,7 +795,7 @@ impl PlayerManager {
                 if player.currrent_track + 1 >= player.primary_queue.len() {
                     (player.primary_queue.len() - 1, true)
                 } else {
-                    (player.currrent_track + 1, false)
+                    (player.currrent_track + 1, true)
                 }
             }
         };
@@ -828,12 +827,12 @@ impl PlayerManager {
 }
 
 impl CacheHttp for PlayerManager {
-    fn cache(&self) -> Option<&Arc<Cache>> {
-        Some(&self.cache)
-    }
-
     fn http(&self) -> &Http {
         &self.http
+    }
+
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        Some(&self.cache)
     }
 }
 

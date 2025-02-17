@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add simd-json support on the Lavalink REST client.
+
 ### Fixed
 
 - Typo in Severity enum (Suspicous -> Suspicious).
@@ -11,7 +15,11 @@
 
 - Add Spotify as the default search provider.
 - Avoid recalculations on pause component.
+- Avoid RwLock and Mutex from tokio when possible in Hydrolink.
+- Change how the Lavalink REST client makes requests.
+- Use parking_lot in Hydrolink instead of std.
 - Update dependencies.
+- Update to Rust 1.84.1.
 
 ### Removed
 
@@ -28,16 +36,19 @@
 - Change Lavalink configuration to the new database URL-like format.
 - Implement a database URL-like configuration for Lavalink.
 - Implement cluster support in the Lavalink client.
-- Refactor the player and it manager.
+- Refactor the player and its manager.
 - Reimplement the Lavalink client using v4 API.
-- Reimplement the Lavalink client to use Enum-returning functions (like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
+- Reimplement the Lavalink client to use Enum-returning functions (
+  like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead
+  of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
 - Update to Alpine 3.21.
 - Update to Rust 1.84.0.
 - Update the dependencies.
 
 ### Fixed
 
-- Wrong play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+- Wrong play command message for playing = true and count >
+    1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 
 ### Removed
 
@@ -94,7 +105,8 @@
 - Add an option to force auto-roll from messages.
 - Add a warning about the public instance ending.
 - Add Portuguese Brazil translation to the public instance warning.
-- Disable auto-roll from messages when another roll bot is detected. ([#40](https://github.com/nashiradeer/hydrogen/issues/40))
+- Disable auto-roll from messages when another roll bot is
+  detected. ([#40](https://github.com/nashiradeer/hydrogen/issues/40))
 
 ### Fixed
 

@@ -64,7 +64,7 @@ async fn process_message(
             let player_value = player.value_mut();
 
             if player_value.node_id == node_id {
-                if let Some(node_id) = player_manager.lavalink.search_connected_node().await {
+                if let Some(node_id) = player_manager.lavalink.search_connected_node() {
                     event!(
                         Level::DEBUG,
                         old_node = player_value.node_id,
