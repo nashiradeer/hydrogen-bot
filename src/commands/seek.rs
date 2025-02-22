@@ -12,6 +12,7 @@ use crate::{
         serenity_command_description, serenity_command_name, serenity_command_option_description,
         serenity_command_option_name, t_vars,
     },
+    utils,
     utils::{
         progress_bar,
         time_parsers::{semicolon_syntax, suffix_syntax},
@@ -42,15 +43,12 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         return Cow::borrowed(t(&interaction.locale, "error.unknown"));
     };
 
-    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
-        guild
-            .voice_states
-            .get(&interaction.user.id)
-            .and_then(|voice_state| voice_state.channel_id)
-    }) else {
-        event!(Level::INFO, "user voice state is None");
-        return Cow::borrowed(t(&interaction.locale, "error.unknown_voice_state"));
-    };
+    let voice_channel_id =
+        match utils::get_voice_channel(context, &interaction.locale, guild_id, interaction.user.id)
+        {
+            Ok(v) => v,
+            Err(e) => return e,
+        };
 
     if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
         if my_channel_id == voice_channel_id {

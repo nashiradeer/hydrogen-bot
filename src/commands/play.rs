@@ -2,8 +2,12 @@
 
 use beef::lean::Cow;
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    ChannelId, CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    GuildId,
 };
+use songbird::{Call, Songbird};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing::{event, Level};
 
 use crate::{
@@ -12,7 +16,7 @@ use crate::{
         serenity_command_option_name, t, t_vars,
     },
     music::PlayResult,
-    PLAYER_MANAGER,
+    utils, PLAYER_MANAGER,
 };
 
 /// Executes the `/play` command.
@@ -37,19 +41,16 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         return Cow::borrowed(t(&interaction.locale, "error.unknown"));
     };
 
-    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
-        guild
-            .voice_states
-            .get(&interaction.user.id)
-            .and_then(|voice_state| voice_state.channel_id)
-    }) else {
-        event!(Level::INFO, "user voice state is None");
-        return Cow::borrowed(t(&interaction.locale, "error.unknown_voice_state"));
-    };
-
-    let Some(voice_manager) = songbird::get(context).await else {
-        event!(Level::ERROR, "songbird::get() returned None");
-        return Cow::borrowed(t(&interaction.locale, "error.unknown"));
+    let (voice_manager, voice_channel_id) = match utils::get_voice_essentials(
+        context,
+        &interaction.locale,
+        guild_id,
+        interaction.user.id,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return e,
     };
 
     let call = match voice_manager.get(guild_id) {
@@ -57,24 +58,31 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
             let has_connection = v.lock().await.current_connection().is_some();
 
             if !has_connection {
-                // Join the voice channel.
-                match voice_manager.join_gateway(guild_id, voice_channel_id).await {
-                    Ok(v) => v.1,
-                    Err(e) => {
-                        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
-                        return Cow::borrowed(t(&interaction.locale, "error.cant_connect"));
-                    }
+                match join_gateway(
+                    &voice_manager,
+                    guild_id,
+                    voice_channel_id,
+                    &interaction.locale,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => return e,
                 }
             } else {
                 v
             }
         }
-        None => match voice_manager.join_gateway(guild_id, voice_channel_id).await {
-            Ok(e) => e.1,
-            Err(e) => {
-                event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
-                return Cow::borrowed(t(&interaction.locale, "error.cant_connect"));
-            }
+        None => match join_gateway(
+            &voice_manager,
+            guild_id,
+            voice_channel_id,
+            &interaction.locale,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => return e,
         },
     };
 
@@ -123,27 +131,40 @@ pub fn create_command() -> CreateCommand {
     command = serenity_command_description("play.description", command);
 
     command
-            .description(
-                "Request music to be played, enqueuing it in the queue or playing immediately if empty.",
+        .description(
+            "Request music to be played, enqueuing it in the queue or playing immediately if empty.",
+        )
+        .add_option({
+            let mut option = CreateCommandOption::new(
+                CommandOptionType::String,
+                "query",
+                "A music or playlist URL, or a search term.",
             )
-            .add_option({
-                let mut option = CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "query",
-                    "A music or playlist URL, or a search term.",
-                )
                 .required(true);
 
-                    option =
-                        serenity_command_option_name("play.query_name", option);
-                    option = serenity_command_option_description(
-                        "play.query_description",
-                        option,
-                    );
+            option =
+                serenity_command_option_name("play.query_name", option);
+            option = serenity_command_option_description(
+                "play.query_description",
+                option,
+            );
 
-                option
-            })
-            .dm_permission(false)
+            option
+        })
+        .dm_permission(false)
+}
+
+/// Joins the voice channel.
+async fn join_gateway<'a>(
+    voice_manager: &Arc<Songbird>,
+    guild_id: GuildId,
+    voice_channel_id: ChannelId,
+    locale: &str,
+) -> Result<Arc<Mutex<Call>>, Cow<'a, str>> {
+    voice_manager.join_gateway(guild_id, voice_channel_id).await.map(|e| e.1).map_err(|e| {
+        event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
+        Cow::borrowed(t(&locale, "error.cant_connect"))
+    })
 }
 
 /// Generates the message from the result from the player.

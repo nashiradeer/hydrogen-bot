@@ -7,7 +7,7 @@ use tracing::{event, Level};
 use crate::i18n::t;
 use crate::{
     i18n::{serenity_command_description, serenity_command_name, t_vars},
-    LOADED_COMMANDS, PLAYER_MANAGER,
+    utils, LOADED_COMMANDS, PLAYER_MANAGER,
 };
 
 /// Executes the `/join` command.
@@ -27,19 +27,16 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         return Cow::borrowed(t(&interaction.locale, "error.player_exists"));
     }
 
-    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
-        guild
-            .voice_states
-            .get(&interaction.user.id)
-            .and_then(|voice_state| voice_state.channel_id)
-    }) else {
-        event!(Level::INFO, "user voice state is None");
-        return Cow::borrowed(t(&interaction.locale, "error.unknown_voice_state"));
-    };
-
-    let Some(voice_manager) = songbird::get(context).await else {
-        event!(Level::ERROR, "songbird::get() returned None");
-        return Cow::borrowed(t(&interaction.locale, "error.unknown"));
+    let (voice_manager, voice_channel_id) = match utils::get_voice_essentials(
+        context,
+        &interaction.locale,
+        guild_id,
+        interaction.user.id,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => return e,
     };
 
     if let Err(e) = voice_manager.join_gateway(guild_id, voice_channel_id).await {
