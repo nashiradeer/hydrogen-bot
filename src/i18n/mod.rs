@@ -1,5 +1,7 @@
 //! Internationalization module.
 
+use beef::lean::Cow;
+use dynfmt::{Format, FormatArgs, SimpleCurlyFormat};
 use phf::Map;
 use serenity::all::{CreateCommand, CreateCommandOption};
 
@@ -25,18 +27,15 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
 }
 
 /// Translate a key to a specific language with variables.
-pub fn t_vars<'a, S: AsRef<str>, T: IntoIterator<Item = (&'a str, S)>>(
-    lang: &str,
-    key: &str,
-    vars: T,
-) -> String {
-    let mut content = t(lang, key).to_owned();
+pub fn t_vars<'a, A: FormatArgs>(lang: &str, key: &'a str, args: A) -> Cow<'a, str> {
+    let content = t(lang, key);
 
-    for (k, v) in vars.into_iter() {
-        content = content.replace(&format!("{{{}}}", k), v.as_ref());
+    let formatted = SimpleCurlyFormat.format(&content, &args);
+
+    match formatted {
+        Ok(s) => <Cow<'a, str>>::from(s),
+        Err(_) => Cow::borrowed(content),
     }
-
-    content
 }
 
 /// Translate a key to all available languages.
