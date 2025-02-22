@@ -5,6 +5,7 @@
 ### Added
 
 - Add simd-json support on the Lavalink REST client.
+- Delete the player message when there's no player.
 - Use the member's avatar instead of the user's avatar on the player message.
 - Send a follow-up message when it's not possible defer or edit an interaction.
 
