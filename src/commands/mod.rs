@@ -1,15 +1,14 @@
 //! Controls the command execution flow.
 
+use beef::lean::Cow;
 use serenity::all::{CommandInteraction, Context, CreateCommand};
 use tracing::{event, Level};
-
-use crate::handler::Response;
 
 mod join;
 mod play;
 mod seek;
 
-pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Option<Response<'a>> {
+pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Option<Cow<'a, str>> {
     Some(match command.data.name.as_str() {
         "join" => join::execute(context, command).await,
         "seek" => seek::execute(context, command).await,

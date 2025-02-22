@@ -1,35 +1,25 @@
 //! 'loop' component execution.
 
+use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
 use crate::{
-    handler::{Response, ResponseType, ResponseValue},
     i18n::{t, t_vars},
     music::LoopMode,
     PLAYER_MANAGER,
 };
 
 /// Executes the `loop` command.
-pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Response<'a> {
-    let guild_id = match interaction.guild_id {
-        Some(v) => v,
-        None => {
-            event!(Level::WARN, "interaction.guild_id is None");
-            return Response::new(
-                "loop.embed_title",
-                "error.not_in_guild",
-                ResponseType::Error,
-            );
-        }
+pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Cow<'a, str> {
+    let Some(guild_id) = interaction.guild_id else {
+        event!(Level::WARN, "interaction.guild_id is None");
+        return Cow::borrowed(t(&interaction.locale, "error.not_in_guild"));
     };
 
-    let manager = match PLAYER_MANAGER.get() {
-        Some(v) => v,
-        None => {
-            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
-            return Response::new("loop.embed_title", "error.unknown", ResponseType::Error);
-        }
+    let Some(manager) = PLAYER_MANAGER.get() else {
+        event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
+        return Cow::borrowed(t(&interaction.locale, "error.unknown"));
     };
 
     let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
@@ -39,11 +29,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
         event!(Level::INFO, "user voice state is None");
-        return Response::new(
-            "loop.embed_title",
-            "error.unknown_voice_state",
-            ResponseType::Error,
-        );
+        return Cow::borrowed(t(&interaction.locale, "error.unknown_voice_state"));
     };
 
     let player_state = manager
@@ -65,27 +51,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
             let loop_type_translation = t(&interaction.locale, loop_type_translation_key);
 
-            Response::raw(
-                ResponseValue::TranslationKey("loop.embed_title"),
-                ResponseValue::RawString(t_vars(
-                    &interaction.locale,
-                    "loop.looping",
-                    [("loop", loop_type_translation)],
-                )),
-                ResponseType::Success,
-            )
+            t_vars(&interaction.locale, "loop.looping", [loop_type_translation])
         } else {
-            Response::new(
-                "loop.embed_title",
-                "error.not_in_voice_chat",
-                ResponseType::Error,
-            )
+            Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
-        Response::new(
-            "loop.embed_title",
-            "error.player_not_exists",
-            ResponseType::Error,
-        )
+        Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }

@@ -2,10 +2,9 @@
 //!
 //! This module contains all the components from Hydrogen.
 
+use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::error;
-
-use crate::handler::Response;
 
 mod loop_switch;
 mod pause;
@@ -16,7 +15,7 @@ mod stop;
 pub async fn execute<'a>(
     context: &Context,
     component: &ComponentInteraction,
-) -> Option<Response<'a>> {
+) -> Option<Cow<'a, str>> {
     Some(match component.data.custom_id.as_str() {
         "loop" => loop_switch::execute(context, component).await,
         "pause" => pause::execute(context, component).await,

@@ -1,33 +1,22 @@
 //! 'pause' component execution.
 
+use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
-use crate::{
-    handler::{Response, ResponseType},
-    PLAYER_MANAGER,
-};
+use crate::i18n::t;
+use crate::PLAYER_MANAGER;
 
 /// Executes the `pause` command.
-pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Response<'a> {
-    let guild_id = match interaction.guild_id {
-        Some(v) => v,
-        None => {
-            event!(Level::WARN, "interaction.guild_id is None");
-            return Response::new(
-                "pause.embed_title",
-                "error.not_in_guild",
-                ResponseType::Error,
-            );
-        }
+pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Cow<'a, str> {
+    let Some(guild_id) = interaction.guild_id else {
+        event!(Level::WARN, "interaction.guild_id is None");
+        return Cow::borrowed(t(&interaction.locale, "error.not_in_guild"));
     };
 
-    let manager = match PLAYER_MANAGER.get() {
-        Some(v) => v,
-        None => {
-            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
-            return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
-        }
+    let Some(manager) = PLAYER_MANAGER.get() else {
+        event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
+        return Cow::borrowed(t(&interaction.locale, "error.unknown"));
     };
 
     let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
@@ -37,11 +26,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
         event!(Level::INFO, "user voice state is None");
-        return Response::new(
-            "pause.embed_title",
-            "error.unknown_voice_state",
-            ResponseType::Error,
-        );
+        return Cow::borrowed(t(&interaction.locale, "error.unknown_voice_state"));
     };
 
     let player_state = manager
@@ -54,7 +39,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
             if let Err(e) = manager.set_pause(guild_id, new_paused).await {
                 event!(Level::ERROR, error = ?e, pause = new_paused, "cannot resume/pause the player");
-                return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
+                return Cow::borrowed(t(&interaction.locale, "error.unknown"));
             }
 
             let translation_key = if new_paused {
@@ -63,19 +48,11 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 "pause.resumed"
             };
 
-            Response::new("pause.embed_title", translation_key, ResponseType::Success)
+            Cow::borrowed(t(&interaction.locale, translation_key))
         } else {
-            Response::new(
-                "pause.embed_title",
-                "error.not_in_voice_channel",
-                ResponseType::Error,
-            )
+            Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
-        Response::new(
-            "pause.embed_title",
-            "error.player_not_exists",
-            ResponseType::Error,
-        )
+        Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }
