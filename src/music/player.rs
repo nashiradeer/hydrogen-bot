@@ -17,11 +17,9 @@ pub struct Player {
     /// The message ID of the player.
     pub message_id: Option<MessageId>,
     /// The queue of tracks.
-    pub primary_queue: Vec<Track>,
-    /// The secondary queue of tracks for PlayTogether.
-    pub _secondary_queue: Option<Vec<Track>>,
+    pub queue: Vec<Track>,
     /// The current track being played.
-    pub currrent_track: usize,
+    pub current_track: usize,
     /// The loop mode of the player.
     pub loop_mode: LoopMode,
     /// If the player is paused.
@@ -46,9 +44,8 @@ impl Player {
         Self {
             channel_id: Some(channel_id),
             message_id: None,
-            primary_queue: Vec::new(),
-            _secondary_queue: None,
-            currrent_track: 0,
+            queue: Vec::new(),
+            current_track: 0,
             loop_mode,
             paused,
             node_id,
@@ -92,7 +89,7 @@ impl From<&Player> for PlayerState {
             text_channel: player.channel_id,
             message_id: player.message_id,
             locale: player.locale.clone(),
-            track: player.primary_queue.get(player.currrent_track).cloned(),
+            track: player.queue.get(player.current_track).cloned(),
             node_id: player.node_id,
             loop_mode: player.loop_mode,
         }
@@ -101,8 +98,8 @@ impl From<&Player> for PlayerState {
 
 impl From<Player> for PlayerState {
     fn from(mut player: Player) -> Self {
-        let track = if player.primary_queue.len() > player.currrent_track {
-            Some(player.primary_queue.remove(player.currrent_track))
+        let track = if player.queue.len() > player.current_track {
+            Some(player.queue.remove(player.current_track))
         } else {
             None
         };

@@ -12,7 +12,7 @@
 - [ ] Rename seek to time.
 - [ ] Rework join to have templates for the Music Player.
 - [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
-- [ ] Remove PlayTogether from the Music Player.
+- [x] Remove PlayTogether from the Music Player.
 - [ ] Filter Lavalink's Stats and PlayerUpdate messages from logs.
 - [ ] Use songbird ConnectionInfo instead of store VoiceState.
 

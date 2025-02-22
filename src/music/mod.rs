@@ -158,9 +158,7 @@ impl PlayerManager {
     /// Get the current track playing in a player.
     pub fn get_current_track(&self, guild_id: GuildId) -> Option<Track> {
         self.players
-            .view(&guild_id, |_, p| {
-                p.primary_queue.get(p.currrent_track).cloned()
-            })
+            .view(&guild_id, |_, p| p.queue.get(p.current_track).cloned())
             .flatten()
     }
 
@@ -288,7 +286,7 @@ impl PlayerManager {
 
         let original_queue_size = self
             .players
-            .view(&guild_id, |_, p| p.primary_queue.len())
+            .view(&guild_id, |_, p| p.queue.len())
             .unwrap_or(0);
 
         let available_size = HYDROGEN_QUEUE_LIMIT - original_queue_size;
@@ -322,7 +320,7 @@ impl PlayerManager {
             .get_mut(&guild_id)
             .ok_or(Error::InvalidGuildId)?;
 
-        player.primary_queue.extend(tracks);
+        player.queue.extend(tracks);
 
         let player_state = PlayerState::from(player.value());
 
@@ -351,9 +349,7 @@ impl PlayerManager {
 
         let mut this_play_track = self
             .players
-            .view(&guild_id, |_, p| {
-                p.primary_queue.get(original_queue_size).cloned()
-            })
+            .view(&guild_id, |_, p| p.queue.get(original_queue_size).cloned())
             .flatten();
 
         if lavalink_not_playing {
@@ -376,11 +372,11 @@ impl PlayerManager {
                 .get_mut(&guild_id)
                 .ok_or(Error::InvalidGuildId)?;
 
-            if index >= player.primary_queue.len() {
+            if index >= player.queue.len() {
                 index = original_queue_size;
             }
 
-            player.currrent_track = index;
+            player.current_track = index;
             player.paused = false;
 
             drop(player);
@@ -483,13 +479,13 @@ impl PlayerManager {
             .get_mut(&guild_id)
             .ok_or(Error::InvalidGuildId)?;
 
-        player.currrent_track = if player.currrent_track > 0 {
-            player.currrent_track - 1
+        player.current_track = if player.current_track > 0 {
+            player.current_track - 1
         } else {
-            player.primary_queue.len() - 1
+            player.queue.len() - 1
         };
 
-        let current_track = player.primary_queue.get(player.currrent_track).cloned();
+        let current_track = player.queue.get(player.current_track).cloned();
 
         drop(player);
 
@@ -505,9 +501,9 @@ impl PlayerManager {
             .get_mut(&guild_id)
             .ok_or(Error::InvalidGuildId)?;
 
-        player.currrent_track = (player.currrent_track + 1) % player.primary_queue.len();
+        player.current_track = (player.current_track + 1) % player.queue.len();
 
-        let current_track = player.primary_queue.get(player.currrent_track).cloned();
+        let current_track = player.queue.get(player.current_track).cloned();
 
         drop(player);
 
@@ -521,8 +517,8 @@ impl PlayerManager {
         let player_state = self
             .players
             .view(&guild_id, |_, p| {
-                p.primary_queue
-                    .get(p.currrent_track)
+                p.queue
+                    .get(p.current_track)
                     .map(|t| (t.track.clone(), p.paused, p.node_id))
             })
             .flatten();
@@ -782,27 +778,24 @@ impl PlayerManager {
 
         let (new_index, should_pause) = match player.loop_mode {
             LoopMode::None => {
-                if player.currrent_track + 1 >= player.primary_queue.len() {
-                    (player.primary_queue.len() - 1, true)
+                if player.current_track + 1 >= player.queue.len() {
+                    (player.queue.len() - 1, true)
                 } else {
-                    (player.currrent_track + 1, false)
+                    (player.current_track + 1, false)
                 }
             }
-            LoopMode::Single => (player.currrent_track, false),
-            LoopMode::All => (
-                player.currrent_track + 1 % player.primary_queue.len(),
-                false,
-            ),
+            LoopMode::Single => (player.current_track, false),
+            LoopMode::All => (player.current_track + 1 % player.queue.len(), false),
             LoopMode::Autopause => {
-                if player.currrent_track + 1 >= player.primary_queue.len() {
-                    (player.primary_queue.len() - 1, true)
+                if player.current_track + 1 >= player.queue.len() {
+                    (player.queue.len() - 1, true)
                 } else {
-                    (player.currrent_track + 1, true)
+                    (player.current_track + 1, true)
                 }
             }
         };
 
-        player.currrent_track = new_index;
+        player.current_track = new_index;
         player.paused = should_pause;
 
         drop(player);
