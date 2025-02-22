@@ -40,15 +40,13 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             manager.set_loop_mode(guild_id, new_loop_mode).await;
 
             let loop_type_translation_key = match new_loop_mode {
-                LoopMode::None => "loop.autostart",
-                LoopMode::Autopause => "loop.no_autostart",
+                LoopMode::None => "loop.normal",
+                LoopMode::Autopause => "loop.pause",
                 LoopMode::Single => "loop.music",
                 LoopMode::All => "loop.queue",
             };
 
-            let loop_type_translation = t(&interaction.locale, loop_type_translation_key);
-
-            t_vars(&interaction.locale, "loop.looping", [loop_type_translation])
+            Cow::borrowed(t(&interaction.locale, loop_type_translation_key))
         } else {
             Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
