@@ -29,6 +29,10 @@ version = "0.1.5"
 default-features = false
 features = ["curly"]
 
+[dependencies.moka]
+version = "0.12.10"
+features = ["sync"]
+
 [dependencies.phf]
 version = "0.11.2"
 features = ["macros"]
