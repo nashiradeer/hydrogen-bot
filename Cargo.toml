@@ -68,6 +68,7 @@ features = [
 [dependencies.simd-json]
 version = "0.14.3"
 optional = true
+features = ["beef"]
 
 [dependencies.songbird]
 version = "0.4.3"

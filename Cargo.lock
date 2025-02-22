@@ -2283,6 +2283,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa2bcf6c6e164e81bc7a5d49fc6988b3d515d9e8c07457d7b74ffb9324b9cd40"
 dependencies = [
+ "beef",
  "getrandom 0.2.15",
  "halfbrown",
  "ref-cast",
