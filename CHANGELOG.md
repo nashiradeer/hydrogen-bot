@@ -5,11 +5,8 @@
 ### Added
 
 - Add simd-json support on the Lavalink REST client.
-
-### Fixed
-
-- Typo in Severity enum (Suspicous -> Suspicious).
-- Play command is only returning the current track instead of the new one.
+- Use the member's avatar instead of the user's avatar on the player message.
+- Send a follow-up message when it's not possible defer or edit an interaction.
 
 ### Changed
 
@@ -17,13 +14,26 @@
 - Avoid recalculations on pause component.
 - Avoid RwLock and Mutex from tokio when possible in Hydrolink.
 - Change how the Lavalink REST client makes requests.
+- Use Cow<str> instead of String when possible.
+- Use dynfmt crate instead of `String::replace`.
+- Use Hydrogen's green instead of Discord's blue as primary color.
+- Use moka crate for caching old messages to deletion.
 - Use parking_lot in Hydrolink instead of std.
+- Use plain text instead of embeds for responses.
 - Update dependencies.
 - Update to Rust 1.84.1.
+
+### Fixed
+
+- Pause icon is inverted on the player message.
+- Play command is only returning the current track instead of the new one.
+- Thumbnail is appearing when player has a destroy handle.
+- Typo in Severity enum (Suspicous -> Suspicious).
 
 ### Removed
 
 - Default log level for the Docker images.
+- Queue component button from the player message.
 
 ## [0.0.1-alpha.12] - 2025-01-18
 
