@@ -30,7 +30,7 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
 pub fn t_vars<'a, A: FormatArgs>(lang: &str, key: &'a str, args: A) -> Cow<'a, str> {
     let content = t(lang, key);
 
-    let formatted = SimpleCurlyFormat.format(&content, &args);
+    let formatted = SimpleCurlyFormat.format(content, &args);
 
     match formatted {
         Ok(s) => <Cow<'a, str>>::from(s),

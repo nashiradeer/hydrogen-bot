@@ -163,7 +163,7 @@ async fn join_gateway<'a>(
 ) -> Result<Arc<Mutex<Call>>, Cow<'a, str>> {
     voice_manager.join_gateway(guild_id, voice_channel_id).await.map(|e| e.1).map_err(|e| {
         event!(Level::INFO, voice_channel_id = %voice_channel_id, error = ?e, "cannot join the voice channel");
-        Cow::borrowed(t(&locale, "error.cant_connect"))
+        Cow::borrowed(t(locale, "error.cant_connect"))
     })
 }
 

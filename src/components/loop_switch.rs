@@ -4,11 +4,7 @@ use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
-use crate::{
-    i18n::{t, t_vars},
-    music::LoopMode,
-    utils, PLAYER_MANAGER,
-};
+use crate::{i18n::t, music::LoopMode, utils, PLAYER_MANAGER};
 
 /// Executes the `loop` command.
 pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Cow<'a, str> {

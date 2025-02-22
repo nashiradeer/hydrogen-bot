@@ -50,7 +50,7 @@ pub async fn get_voice_essentials<'a>(
 
     let Some(voice_manager) = songbird::get(context).await else {
         event!(Level::ERROR, "songbird::get() returned None");
-        return Err(Cow::borrowed(t(&locale, "error.unknown")));
+        return Err(Cow::borrowed(t(locale, "error.unknown")));
     };
 
     Ok((voice_manager, voice_channel_id))
@@ -70,7 +70,7 @@ pub fn get_voice_channel<'a>(
             .and_then(|voice_state| voice_state.channel_id)
     }) else {
         event!(Level::INFO, "user voice state is None");
-        return Err(Cow::borrowed(t(&locale, "error.unknown_voice_state")));
+        return Err(Cow::borrowed(t(locale, "error.unknown_voice_state")));
     };
 
     Ok(voice_channel_id)
