@@ -3,10 +3,7 @@
 use std::time::Duration;
 
 /// The embed color used for success messages.
-pub const HYDROGEN_PRIMARY_COLOR: i32 = 0x5865f2;
-
-/// The embed color used for error messages.
-pub const HYDROGEN_ERROR_COLOR: i32 = 0xf04747;
+pub const HYDROGEN_PRIMARY_COLOR: i32 = 0x0db363;
 
 /// Time in seconds to wait before exit from an empty voice channel.
 pub const HYDROGEN_EMPTY_CHAT_TIMEOUT: u64 = 10;
@@ -20,10 +17,6 @@ pub static HYDROGEN_SEARCH_PREFIXES: [&str; 4] =
 
 /// Connection timeout for the Lavalink node in seconds.
 pub const LAVALINK_RECONNECTION_DELAY: u64 = 5;
-
-/// Hydrogen's logo URL, used in embed's footers.
-pub static HYDROGEN_LOGO_URL: &str =
-    "https://raw.githubusercontent.com/nashiradeer/hydrogen/main/assets/icons/hydrogen-circular.png";
 
 #[allow(dead_code)]
 /// Hydrogen's version.

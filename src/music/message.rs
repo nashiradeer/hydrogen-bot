@@ -1,3 +1,4 @@
+use beef::lean::Cow;
 use serenity::all::{
     ButtonStyle, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor,
     CreateMessage, EditMessage, GuildId, MessageId, ReactionType,
@@ -23,8 +24,6 @@ const DISABLE_STOP: bool = false;
 const DISABLE_LOOP: bool = false;
 /// Whether to disable the shuffle button.
 const DISABLE_SHUFFLE: bool = true;
-/// Whether to disable the queue button.
-const DISABLE_QUEUE: bool = true;
 
 /// Updates the player message.
 pub async fn update_message(
@@ -48,15 +47,17 @@ pub async fn update_message(
     let description = generate_message(player, track);
     let url = generate_url(player, track);
     let author = generate_author(manager, player, guild_id).await;
+    // It's very cheaper to clone the author than re-generate it
+    let author_clone = author.clone();
     let components = generate_components(player, &state);
 
-    let embed = generate_embed(
-        &description,
-        title,
-        url,
-        track.and_then(|track| track.thumbnail.clone()),
-        author,
-    );
+    let thumbnail = if player.has_destroy_handle {
+        None
+    } else {
+        track.and_then(|track| track.thumbnail.as_ref())
+    };
+
+    let embed = generate_embed(&description, title, url, thumbnail, author);
 
     if let Some(channel_id) = player.text_channel {
         if let Some(message_id) = player.message_id {
@@ -64,9 +65,7 @@ pub async fn update_message(
                 .edit_message(
                     &manager,
                     message_id,
-                    EditMessage::new()
-                        .embed(embed.clone())
-                        .components(components.clone()),
+                    EditMessage::new().embed(embed).components(components),
                 )
                 .await
             {
@@ -90,6 +89,17 @@ pub async fn update_message(
                 }
             }
         }
+
+        // Normally we should never reach this point, so it's better have a performance overhead here than cloning everything in edit_message
+        let embed = generate_embed(
+            &description,
+            generate_title(player, track),
+            url,
+            track.and_then(|track| track.thumbnail.as_ref()),
+            author_clone,
+        );
+
+        let components = generate_components(player, &state);
 
         return match channel_id
             .send_message(
@@ -127,8 +137,8 @@ pub async fn update_message(
 fn generate_embed(
     description: &str,
     title: Option<String>,
-    url: Option<String>,
-    thumbnail: Option<String>,
+    url: Option<&String>,
+    thumbnail: Option<&String>,
     author: Option<CreateEmbedAuthor>,
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
@@ -164,25 +174,25 @@ fn generate_title(player: &PlayerState, track: Option<&Track>) -> Option<String>
 }
 
 /// Generates the message description.
-fn generate_message(player: &PlayerState, track: Option<&Track>) -> String {
+fn generate_message<'a>(player: &PlayerState, track: Option<&'a Track>) -> Cow<'a, str> {
     if player.has_destroy_handle {
         t_vars(
             &player.locale,
             "player.timeout",
-            [("time", HYDROGEN_EMPTY_CHAT_TIMEOUT.to_string())],
+            [HYDROGEN_EMPTY_CHAT_TIMEOUT],
         )
     } else {
         match track {
-            Some(track) => track.author.clone(),
-            None => t(&player.locale, "player.empty").to_owned(),
+            Some(track) => Cow::borrowed(&track.author),
+            None => Cow::borrowed(t(&player.locale, "player.empty")),
         }
     }
 }
 
 /// Generates the URL for the embed.
-fn generate_url(player: &PlayerState, track: Option<&Track>) -> Option<String> {
-    if player.has_destroy_handle {
-        track.and_then(|track| track.url.clone())
+fn generate_url<'a>(player: &PlayerState, track: Option<&'a Track>) -> Option<&'a String> {
+    if !player.has_destroy_handle {
+        track.and_then(|track| track.url.as_ref())
     } else {
         None
     }
@@ -211,13 +221,19 @@ async fn generate_author(
         Some(name) => name,
         None => {
             let user = valid_track.requester.to_user(manager).await.ok()?;
-            user.global_name.unwrap_or(user.name.clone())
+            user.global_name.unwrap_or(user.name)
         }
     };
 
     let mut author = CreateEmbedAuthor::new(user_name);
 
-    if let Some(avatar) = user.and_then(|v| v.avatar_url()) {
+    if let Some(avatar) = guild_id
+        .member(manager, valid_track.requester)
+        .await
+        .ok()
+        .and_then(|v| v.avatar_url())
+        .or(user.and_then(|v| v.avatar_url()))
+    {
         author = author.icon_url(avatar);
     }
 
@@ -260,10 +276,6 @@ fn generate_components(player: &PlayerState, state: &PlayerMessageState) -> Vec<
                 .disabled(DISABLE_STOP || state.is_thinking())
                 .emoji('⏹')
                 .style(ButtonStyle::Danger),
-            CreateButton::new("queue")
-                .disabled(DISABLE_QUEUE || !state.is_playing())
-                .emoji(ReactionType::Unicode("ℹ️".to_owned()))
-                .style(ButtonStyle::Secondary),
             CreateButton::new("shuffle")
                 .disabled(DISABLE_SHUFFLE || !state.is_playing())
                 .emoji('🔀')

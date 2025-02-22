@@ -1,25 +1,21 @@
-use std::{
-    collections::HashMap,
-    env,
-    process::exit,
-    sync::{Arc, LazyLock, OnceLock},
-    time::Instant,
-};
-
-use dashmap::DashMap;
-use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
+use handler::{handle_command, handle_component, register_commands};
 use lavalink::{cluster::Cluster, Rest};
 use music::PlayerManager;
 use parking_lot::Mutex;
 use serenity::{
     all::{
-        Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Ready,
-        VoiceServerUpdateEvent, VoiceState,
+        Client, CommandId, GatewayIntents, Interaction, Ready, VoiceServerUpdateEvent, VoiceState,
     },
     client::{Context, EventHandler},
 };
 use songbird::SerenityInit;
-use tokio::task::JoinHandle;
+use std::{
+    collections::HashMap,
+    env,
+    process::exit,
+    sync::{Arc, OnceLock},
+    time::Instant,
+};
 use tracing::{event, instrument, Level};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
@@ -42,11 +38,6 @@ pub static LOADED_COMMANDS: OnceLock<HashMap<String, CommandId>> = OnceLock::new
 
 /// Hydrogen's Player Manager.
 pub static PLAYER_MANAGER: OnceLock<PlayerManager> = OnceLock::new();
-
-/// The messages from the components.
-pub static COMPONENTS_MESSAGES: LazyLock<
-    DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
-> = LazyLock::new(DashMap::new);
 
 /// The program's entry point.
 fn main() {

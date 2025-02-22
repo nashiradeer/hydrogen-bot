@@ -4,8 +4,8 @@
 
 - [x] Update dependencies. (if needed)
 - [x] Create a feature for Lavalink can use simd-json instead of serde_json.
-- [ ] Migrate to `dynfmt` crate instead of a lot of `String::replace`.
-- [ ] Migrate to responses using plain text instead of embeds.
+- [x] Migrate to `dynfmt` crate instead of a lot of `String::replace`.
+- [x] Migrate to responses using plain text instead of embeds.
 - [ ] Delete Player Message when there is no player in the
   guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
 - [ ] Rework seek to show current time and total time when no arguments are provided.

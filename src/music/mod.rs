@@ -446,7 +446,7 @@ impl PlayerManager {
 
     /// Set the pause state for the guild.
     pub async fn set_pause(&self, guild_id: GuildId, paused: bool) -> Result<bool> {
-        let player_state = self
+        let mut player_state = self
             .get_player_state(guild_id)
             .ok_or(Error::PlayerNotFound)?;
 
@@ -461,6 +461,8 @@ impl PlayerManager {
             )
             .await
             .map_err(Error::from)?;
+
+        player_state.paused = paused;
 
         let (channel_id, message_id) = update_message(self, guild_id, &player_state, false).await;
 

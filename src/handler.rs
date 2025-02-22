@@ -1,82 +1,111 @@
 //! Command and component handler for Hydrogen.
 
-use std::{collections::HashMap, time::Duration};
-
+use beef::lean::Cow;
+use moka::sync::Cache;
+use serenity::all::{ChannelId, CreateInteractionResponseFollowup, Message};
 use serenity::{
-    all::{ChannelId, Command, CommandInteraction, ComponentInteraction, UserId},
-    builder::{CreateEmbed, CreateEmbedFooter, EditInteractionResponse},
+    all::{Command, CommandInteraction, ComponentInteraction, UserId},
+    builder::EditInteractionResponse,
     client::Context,
     http::Http,
 };
-use tokio::time::sleep;
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::time::Duration;
 use tracing::{event, instrument, Level};
 
-use crate::{
-    commands, components,
-    i18n::t,
-    utils::constants::{HYDROGEN_ERROR_COLOR, HYDROGEN_LOGO_URL, HYDROGEN_PRIMARY_COLOR},
-    COMPONENTS_MESSAGES, LOADED_COMMANDS,
-};
+use crate::{commands, components, LOADED_COMMANDS};
 
-/// Type used to monitor the responses sent by the bot.
-pub type AutoRemoverKey = (ChannelId, UserId);
+/// Cache of the messages used to clean up the old messages when too many messages are sent.
+pub static MESSAGE_CACHE: LazyLock<Cache<(ChannelId, UserId), String>> = LazyLock::new(|| {
+    Cache::builder()
+        .time_to_live(Duration::from_secs(5))
+        .build()
+});
 
 /// Handles a command interaction.
 #[instrument(skip_all, name = "command_handler", fields(command_name = %command.data.name, user_id = %command.user.id, guild_id = ?command.guild_id.map(|v| v.get()), channel_id = %command.channel_id))]
 pub async fn handle_command(context: &Context, command: &CommandInteraction) {
-    if let Err(e) = command.defer_ephemeral(&context.http).await {
-        event!(Level::ERROR, error = ?e, "failed to defer interaction");
-        return;
-    }
+    let common = CommonInteraction::Command(command);
 
-    let response = commands::execute(context, command).await;
+    let deferred = common.defer_ephemeral(&context.http).await;
 
-    if let Some(message) =
-        response.map(|response| response.into_edit_interaction_response(&command.locale))
-    {
-        if let Err(e) = command.edit_response(&context.http, message).await {
-            event!(
-                Level::ERROR,
-                error = ?e,
-                "cannot edit the response"
-            );
-        }
+    if let Some(message) = commands::execute(context, command).await {
+        post_execute(context, deferred, message, &common).await;
     }
 }
 
 /// Handles a component interaction.
+#[instrument(skip_all, name = "component_handler", fields(component_name = %component.data.custom_id, user_id = %component.user.id, guild_id = ?component.guild_id.map(|v| v.get()), channel_id = %component.channel_id))]
 pub async fn handle_component(context: &Context, component: &ComponentInteraction) {
-    if let Err(e) = component.defer_ephemeral(&context.http).await {
-        event!(Level::ERROR, error = ?e, "failed to defer interaction");
-        return;
+    let common = CommonInteraction::Component(component);
+
+    let deferred = common.defer_ephemeral(&context.http).await;
+
+    if let Some(message) = components::execute(context, component).await {
+        post_execute(context, deferred, message, &common).await;
+    }
+}
+
+/// Executed after the command or component execution.
+async fn post_execute(
+    context: &Context,
+    deferred: bool,
+    message: Cow<'_, str>,
+    interaction: &CommonInteraction<'_>,
+) {
+    if let Some(old_message) =
+        MESSAGE_CACHE.remove(&(interaction.channel_id(), interaction.user_id()))
+    {
+        if let Err(e) = context
+            .http
+            .delete_original_interaction_response(&old_message)
+            .await
+        {
+            event!(Level::WARN, error = ?e, "cannot delete the old message");
+        }
     }
 
-    let response = components::execute(context, component).await;
-
-    if let Some(message) =
-        response.map(|response| response.into_edit_interaction_response(&component.locale))
-    {
-        match component.edit_response(&context.http, message).await {
-            Ok(v) => {
-                let auto_remover_key = (v.channel_id, component.user.id);
-
-                let auto_remover = tokio::spawn(async move {
-                    autoremover(auto_remover_key).await;
-                });
-
-                if let Some((auto_remover, old_component)) =
-                    COMPONENTS_MESSAGES.insert(auto_remover_key, (auto_remover, component.clone()))
-                {
-                    auto_remover.abort();
-
-                    if let Err(e) = old_component.delete_response(&context.http).await {
-                        event!(Level::WARN, error = ?e, ?auto_remover_key, "cannot delete the message");
-                    }
-                }
+    if deferred {
+        match interaction
+            .edit_response(
+                &context.http,
+                EditInteractionResponse::new().content(message.as_ref()),
+            )
+            .await
+        {
+            Ok(_) => {
+                MESSAGE_CACHE.insert(
+                    (interaction.channel_id(), interaction.user_id()),
+                    interaction.token().to_owned(),
+                );
+                return;
             }
             Err(e) => {
-                event!(Level::ERROR, error = ?e, "cannot edit the response");
+                event!(Level::WARN, error = ?e, "cannot edit the response");
             }
+        }
+    }
+
+    match interaction
+        .create_followup(
+            &context.http,
+            CreateInteractionResponseFollowup::new().content(message.as_ref()),
+        )
+        .await
+    {
+        Ok(_) => {
+            MESSAGE_CACHE.insert(
+                (interaction.channel_id(), interaction.user_id()),
+                interaction.token().to_owned(),
+            );
+        }
+        Err(e) => {
+            event!(
+                Level::ERROR,
+                error = ?e,
+                "cannot create the response"
+            );
         }
     }
 }
@@ -115,103 +144,72 @@ pub async fn register_commands(http: impl AsRef<Http>) -> bool {
     }
 }
 
-/// Removes the response after a certain time.
-#[instrument(name = "message_autoremover")]
-async fn autoremover(key: AutoRemoverKey) {
-    sleep(Duration::from_secs(10)).await;
-    event!(Level::DEBUG, message = ?key, "removing response from cache...");
-    COMPONENTS_MESSAGES.remove(&key);
+/// A wrapper for command and component interactions for common operations.
+enum CommonInteraction<'a> {
+    /// Command interaction.
+    Command(&'a CommandInteraction),
+    /// Component interaction.
+    Component(&'a ComponentInteraction),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// Represents a response.
-pub struct Response<'a> {
-    /// The translation key for the title.
-    title: ResponseValue<'a>,
-    /// The translation key for the description.
-    description: ResponseValue<'a>,
-    /// The response type.
-    pub response_type: ResponseType,
-}
-
-impl<'a> Response<'a> {
-    pub fn new(title: &'a str, description: &'a str, response_type: ResponseType) -> Self {
-        Self {
-            title: ResponseValue::TranslationKey(title),
-            description: ResponseValue::TranslationKey(description),
-            response_type,
-        }
-    }
-
-    pub fn raw(
-        title: ResponseValue<'a>,
-        description: ResponseValue<'a>,
-        response_type: ResponseType,
-    ) -> Self {
-        Self {
-            title,
-            description,
-            response_type,
-        }
-    }
-
-    /// Converts the response into an embed.
-    pub fn into_embed(self, lang: &str) -> CreateEmbed {
-        CreateEmbed::new()
-            .title(self.title.into_value(lang))
-            .description(self.description.into_value(lang))
-            .color(self.response_type.into_color())
-            .footer(
-                CreateEmbedFooter::new(t(lang, "generic.embed_footer")).icon_url(HYDROGEN_LOGO_URL),
-            )
-    }
-
-    /// Converts the response into an [EditInteractionResponse].
-    pub fn into_edit_interaction_response(self, lang: &str) -> EditInteractionResponse {
-        EditInteractionResponse::new().embed(self.into_embed(lang))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// Represents a response value.
-pub enum ResponseValue<'a> {
-    /// Represents a translation key.
-    TranslationKey(&'a str),
-
-    #[allow(dead_code)]
-    /// Represents a raw value.
-    Raw(&'a str),
-
-    /// Represents a raw string.
-    RawString(String),
-}
-
-impl ResponseValue<'_> {
-    /// Converts the [ResponseValue] into its value.
-    pub fn into_value(self, lang: &str) -> String {
+impl CommonInteraction<'_> {
+    /// Gets the user ID.
+    fn user_id(&self) -> UserId {
         match self {
-            ResponseValue::TranslationKey(key) => t(lang, key).to_owned(),
-            ResponseValue::Raw(value) => value.to_owned(),
-            ResponseValue::RawString(value) => value,
+            Self::Command(v) => v.user.id,
+            Self::Component(v) => v.user.id,
         }
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-/// Represents a response type.
-pub enum ResponseType {
-    /// Represents a successful response.
-    Success,
-    /// Represents an error response.
-    Error,
-}
-
-impl ResponseType {
-    /// Converts the response type into a color.
-    pub fn into_color(self) -> i32 {
+    /// Gets the channel ID.
+    fn channel_id(&self) -> ChannelId {
         match self {
-            ResponseType::Success => HYDROGEN_PRIMARY_COLOR,
-            ResponseType::Error => HYDROGEN_ERROR_COLOR,
+            Self::Command(v) => v.channel_id,
+            Self::Component(v) => v.channel_id,
+        }
+    }
+
+    /// Gets the token.
+    fn token(&self) -> &str {
+        match self {
+            Self::Command(v) => &v.token,
+            Self::Component(v) => &v.token,
+        }
+    }
+
+    /// Defer the interaction.
+    async fn defer_ephemeral(&self, http: &Http) -> bool {
+        match self {
+            Self::Command(v) => v.defer_ephemeral(http).await,
+            Self::Component(v) => v.defer_ephemeral(http).await,
+        }
+        .inspect_err(|e| {
+            event!(Level::WARN, error = ?e, "failed to defer interaction");
+        })
+        .is_ok()
+    }
+
+    /// Edit the response.
+    async fn edit_response(
+        &self,
+        http: &Http,
+        response: EditInteractionResponse,
+    ) -> Result<Message, serenity::Error> {
+        match self {
+            Self::Command(v) => v.edit_response(http, response).await,
+            Self::Component(v) => v.edit_response(http, response).await,
+        }
+    }
+
+    /// Create a followup.
+    async fn create_followup(
+        &self,
+        http: &Http,
+        response: CreateInteractionResponseFollowup,
+    ) -> Result<Message, serenity::Error> {
+        match self {
+            Self::Command(v) => v.create_followup(http, response).await,
+            Self::Component(v) => v.create_followup(http, response).await,
         }
     }
 }
