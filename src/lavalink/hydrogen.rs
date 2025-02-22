@@ -15,7 +15,7 @@ impl ConfigParser {
     pub fn new() -> Result<Self, regex::Error> {
         Ok(Self {
             single_string_regex: Regex::new(
-                r"((?:\[.+\]|[^;:\n]+):[0-9]{1,5})@([^/;\n]+)(?:/([^;\n]+))?;?",
+                r"((?:\[.+]|[^;:\n]+):[0-9]{1,5})@([^/;\n]+)(?:/([^;\n]+))?;?",
             )?,
         })
     }

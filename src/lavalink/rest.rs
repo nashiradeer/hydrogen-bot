@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use super::{model::*, Error, LavalinkResult, Result, LAVALINK_USER_AGENT};
+use super::{model::*, ApiResponse, Error, Result, LAVALINK_USER_AGENT};
 use bytes::{Bytes, BytesMut};
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use reqwest::Client;
@@ -132,7 +132,7 @@ impl Rest {
         {
             Ok(None)
         } else {
-            Into::<Result<T>>::into(self.deserialize_response::<LavalinkResult<T>>(
+            Into::<Result<T>>::into(self.deserialize_response::<ApiResponse<T>>(
                 response.bytes().await.map_err(Error::from)?,
             )?)
             .map(Some)

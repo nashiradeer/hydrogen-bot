@@ -641,19 +641,21 @@ pub struct Error {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-/// Represents a result from the REST API.
-pub enum LavalinkResult<T> {
-    /// Represents a successful result.
+/// A serializable enum containing the expected response or an error from the REST API.
+///
+/// This is used to parse the response from the Lavalink REST API avoiding needing to parse the response twice.
+pub enum ApiResponse<T> {
+    /// Expected response from the REST API.
     Ok(T),
-    /// Represents an error result.
+    /// Error response from the REST API.
     Err(Error),
 }
 
-impl<T> From<LavalinkResult<T>> for Result<T, super::Error> {
-    fn from(result: LavalinkResult<T>) -> Self {
+impl<T> From<ApiResponse<T>> for Result<T, super::Error> {
+    fn from(result: ApiResponse<T>) -> Self {
         match result {
-            LavalinkResult::Ok(value) => Ok(value),
-            LavalinkResult::Err(err) => Err(err.into()),
+            ApiResponse::Ok(value) => Ok(value),
+            ApiResponse::Err(err) => Err(err.into()),
         }
     }
 }
