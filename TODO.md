@@ -14,7 +14,7 @@
 - [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
 - [x] Remove PlayTogether from the Music Player.
 - [ ] Filter Lavalink's Stats and PlayerUpdate messages from logs.
-- [ ] Use songbird ConnectionInfo instead of store VoiceState.
+- [x] Use songbird ConnectionInfo instead of store VoiceState.
 
 ## 0.0.1-alpha.14
 

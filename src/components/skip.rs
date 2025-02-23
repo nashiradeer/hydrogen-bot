@@ -27,7 +27,9 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Err(e) => return e,
         };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
+    let my_channel_id = manager.get_voice_channel_id(guild_id).await;
+
+    if let Some(my_channel_id) = my_channel_id {
         if my_channel_id == voice_channel_id {
             let music = match manager.skip(guild_id).await {
                 Ok(v) => v,
@@ -57,13 +59,13 @@ fn get_message<'a>(track: Track, interaction: &ComponentInteraction) -> Cow<'a, 
     if let Some(uri) = track.url {
         t_vars(
             &interaction.locale,
-            "skip.returning_url",
+            "skip.skipping_url",
             [track.title, track.author, uri],
         )
     } else {
         t_vars(
             &interaction.locale,
-            "skip.returning",
+            "skip.skipping",
             [track.title, track.author],
         )
     }

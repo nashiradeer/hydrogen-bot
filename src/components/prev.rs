@@ -27,7 +27,9 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Err(e) => return e,
         };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
+    let my_channel_id = manager.get_voice_channel_id(guild_id).await;
+
+    if let Some(my_channel_id) = my_channel_id {
         if my_channel_id == voice_channel_id {
             let music = match manager.previous(guild_id).await {
                 Ok(v) => v,

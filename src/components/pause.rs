@@ -29,6 +29,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
     let player_state = manager
         .get_voice_channel_id(guild_id)
+        .await
         .zip(manager.get_pause(guild_id));
 
     if let Some((my_channel_id, paused)) = player_state {

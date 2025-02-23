@@ -17,14 +17,6 @@ use std::{
     time::Duration,
 };
 
-use dashmap::DashMap;
-use lavalink::{handle_lavalink, reconnect_node};
-use serenity::all::{
-    Cache, CacheHttp, ChannelId, ChannelType, GuildId, Http, UserId, VoiceServerUpdateEvent,
-    VoiceState as SerenityVoiceState,
-};
-use songbird::{error::JoinError, Songbird};
-
 use crate::{
     lavalink::{
         cluster::Cluster, Error as LavalinkError, LoadResult, Rest, Track as LavalinkTrack,
@@ -34,14 +26,19 @@ use crate::{
         HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
     },
 };
+use dashmap::DashMap;
+use lavalink::{handle_lavalink, reconnect_node};
+use serenity::all::{
+    Cache, CacheHttp, ChannelId, ChannelType, GuildId, Http, UserId, VoiceServerUpdateEvent,
+    VoiceState as SerenityVoiceState,
+};
+use songbird::{error::JoinError, Songbird};
 
 #[derive(Debug, Clone)]
 /// The player manager.
 pub struct PlayerManager {
     /// The players.
     players: Arc<DashMap<GuildId, Player>>,
-    /// The connections to be used by the players.
-    connections: Arc<DashMap<GuildId, PlayerConnection>>,
     /// The voice manager.
     ///
     /// This [Arc] comes from outside the player manager.
@@ -67,7 +64,6 @@ impl PlayerManager {
         http: Arc<Http>,
     ) -> Self {
         let players = Arc::new(DashMap::<GuildId, Player>::new());
-        let connections = Arc::new(DashMap::<GuildId, PlayerConnection>::new());
 
         for i in 0..lavalink.nodes().len() {
             event!(Level::DEBUG, node_id = i, "connecting to Lavalink...");
@@ -84,7 +80,6 @@ impl PlayerManager {
             lavalink,
             cache,
             http,
-            connections,
         };
 
         handle_lavalink(me.clone());
@@ -139,15 +134,25 @@ impl PlayerManager {
     }
 
     /// Check if the connection exists for the guild.
-    pub fn contains_connection(&self, guild_id: GuildId) -> bool {
-        self.connections.contains_key(&guild_id)
+    pub async fn contains_connection(&self, guild_id: GuildId) -> bool {
+        if let Some(call) = self.songbird.get(guild_id) {
+            let call_locked = call.lock().await;
+
+            call_locked.current_connection().is_some() && call_locked.current_channel().is_some()
+        } else {
+            false
+        }
     }
 
-    /// Check if the connection is ready for the guild.
-    pub fn connection_ready(&self, guild_id: GuildId) -> bool {
-        self.connections
-            .get(&guild_id)
-            .is_some_and(|c| c.is_ready())
+    /// Get the player connection for the guild.
+    pub async fn get_connection(&self, guild_id: GuildId) -> Option<VoiceState> {
+        let call = self.songbird.get(guild_id)?;
+
+        let call_locked = call.lock().await;
+
+        call_locked
+            .current_connection()
+            .map(|c| VoiceState::new(&c.token, &c.endpoint, &c.session_id))
     }
 
     /// Get the player state for the guild.
@@ -165,14 +170,14 @@ impl PlayerManager {
     /// Get the voice channel ID for the guild.
     ///
     /// This method will return `None` if the player does not exist too.
-    pub fn get_voice_channel_id(&self, guild_id: GuildId) -> Option<ChannelId> {
-        if !self.contains_player(guild_id) {
-            return None;
-        }
+    pub async fn get_voice_channel_id(&self, guild_id: GuildId) -> Option<ChannelId> {
+        let call = self.songbird.get(guild_id)?;
 
-        self.connections
-            .view(&guild_id, |_, c| c.serenity_channel_id())
-            .flatten()
+        let call_locked = call.lock().await;
+
+        call_locked
+            .current_channel()
+            .map(|c| ChannelId::new(c.0.into()))
     }
 
     /// Search for the music using multiple prefixes.
@@ -524,15 +529,10 @@ impl PlayerManager {
             .flatten();
 
         if let Some((song, paused, node_id)) = player_state {
-            let voice_state = self
-                .connections
-                .view(&guild_id, |_, c| {
-                    TryInto::<VoiceState>::try_into(c.clone()).ok()
-                })
-                .flatten();
+            let voice = self.get_connection(guild_id).await;
 
             let update_player = UpdatePlayer {
-                voice: voice_state,
+                voice,
                 ..Default::default()
             }
             .set_track(UpdatePlayerTrack::default().set_encoded(&song))
@@ -565,40 +565,17 @@ impl PlayerManager {
 
         let player_state = self.get_player_state(guild_id);
 
-        if voice_state.user_id == self.cache.current_user().id {
-            if let Some(channel_id) = voice_state.channel_id {
-                if !self.contains_connection(guild_id) {
-                    self.connections.insert(
-                        guild_id,
-                        PlayerConnection::default()
-                            .set_session_id(&voice_state.session_id)
-                            .set_channel_id(channel_id.into()),
-                    );
-                } else {
-                    self.connections.alter(&guild_id, |_k, v| {
-                        v.set_session_id(&voice_state.session_id)
-                            .set_channel_id(channel_id.into())
-                    });
-                }
+        let is_me = voice_state.user_id == self.cache.current_user().id;
 
+        if is_me {
+            if voice_state.channel_id.is_some() {
                 if let Some(ref player_state) = player_state {
                     let voice = self
-                        .connections
-                        .view(&guild_id, |_, c| c.clone().try_into().ok())
-                        .flatten();
+                        .get_connection(guild_id)
+                        .await
+                        .map(|c| VoiceState::new(&c.token, &c.endpoint, &voice_state.session_id));
 
-                    let update_player = UpdatePlayer {
-                        voice,
-                        ..Default::default()
-                    };
-
-                    self.lavalink
-                        .update_player(
-                            player_state.node_id,
-                            &guild_id.to_string(),
-                            &update_player,
-                            true,
-                        )
+                    self.update_connection(voice, player_state.node_id, guild_id)
                         .await?;
                 }
             } else {
@@ -607,12 +584,13 @@ impl PlayerManager {
             }
         }
 
-        let channel_id = self
-            .connections
-            .view(&guild_id, |_, v| v.serenity_channel_id())
-            .flatten();
+        let voice_channel_id = if is_me {
+            voice_state.channel_id
+        } else {
+            self.get_voice_channel_id(guild_id).await
+        };
 
-        if let Some(channel_id) = channel_id {
+        if let Some(channel_id) = voice_channel_id {
             let member_count = {
                 let cache_ref = self
                     .cache
@@ -670,46 +648,42 @@ impl PlayerManager {
     pub async fn update_voice_server(&self, voice_server: VoiceServerUpdateEvent) -> Result<bool> {
         let guild_id = voice_server.guild_id.ok_or(Error::InvalidGuildId)?;
 
-        if !self.contains_connection(guild_id) {
-            let mut player_connection = PlayerConnection::default().set_token(&voice_server.token);
-
-            player_connection.endpoint = voice_server.endpoint;
-
-            self.connections.insert(guild_id, player_connection);
-        } else {
-            self.connections.alter(&guild_id, |_k, v| PlayerConnection {
-                token: Some(voice_server.token.clone()),
-                endpoint: voice_server.endpoint,
-                ..v
-            });
-        }
-
         if self.contains_player(guild_id) {
             let player_state = self.get_player_state(guild_id);
 
             if let Some(player_state) = player_state {
-                let voice = self
-                    .connections
-                    .view(&guild_id, |_, c| c.clone().try_into().ok())
-                    .flatten();
+                let voice = self.get_connection(guild_id).await.and_then(|c| {
+                    voice_server
+                        .endpoint
+                        .map(|e| VoiceState::new(&voice_server.token, &e, &c.session_id))
+                });
 
-                let update_player = UpdatePlayer {
-                    voice,
-                    ..Default::default()
-                };
-
-                self.lavalink
-                    .update_player(
-                        player_state.node_id,
-                        &guild_id.to_string(),
-                        &update_player,
-                        true,
-                    )
+                self.update_connection(voice, player_state.node_id, guild_id)
                     .await?;
             }
         }
 
         Ok(true)
+    }
+
+    async fn update_connection(
+        &self,
+        voice: Option<VoiceState>,
+        node_id: usize,
+        guild_id: GuildId,
+    ) -> Result<()> {
+        if voice.is_some() {
+            let update_player = UpdatePlayer {
+                voice,
+                ..Default::default()
+            };
+
+            self.lavalink
+                .update_player(node_id, &guild_id.to_string(), &update_player, true)
+                .await?;
+        }
+
+        Ok(())
     }
 
     /// Destroy the player, stopping the music and leaving the voice channel.
