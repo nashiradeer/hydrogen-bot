@@ -125,20 +125,18 @@ async fn process_message(
             time = ?exec_time,
             "handling the Lavalink event took too long"
         );
+    } else if !spammy_message {
+        event!(
+            Level::INFO,
+            time = ?exec_time,
+            "Lavalink event handled"
+        );
     } else {
-        if !spammy_message {
-            event!(
-                Level::INFO,
-                time = ?exec_time,
-                "Lavalink event handled"
-            );
-        } else {
-            event!(
-                Level::DEBUG,
-                time = ?exec_time,
-                "Lavalink event handled"
-            );
-        }
+        event!(
+            Level::DEBUG,
+            time = ?exec_time,
+            "Lavalink event handled"
+        );
     }
 }
 
