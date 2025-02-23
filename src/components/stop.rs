@@ -5,6 +5,7 @@ use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
 use crate::i18n::t;
+use crate::utils::delete_player_message;
 use crate::{utils, PLAYER_MANAGER};
 
 /// Executes the `stop` command.
@@ -26,7 +27,9 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Err(e) => return e,
         };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
+    let my_channel_id = manager.get_voice_channel_id(guild_id).await;
+
+    if let Some(my_channel_id) = my_channel_id {
         if my_channel_id == voice_channel_id {
             if let Err(e) = manager.destroy(guild_id).await {
                 event!(Level::ERROR, error = ?e, "cannot stop the player");
@@ -38,6 +41,8 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
+        delete_player_message(context, interaction).await;
+
         Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }

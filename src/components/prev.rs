@@ -5,6 +5,7 @@ use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
 use crate::i18n::t;
+use crate::utils::delete_player_message;
 use crate::{i18n::t_vars, music::Track, utils, PLAYER_MANAGER};
 
 /// Executes the `prev` command.
@@ -26,7 +27,9 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Err(e) => return e,
         };
 
-    if let Some(my_channel_id) = manager.get_voice_channel_id(guild_id) {
+    let my_channel_id = manager.get_voice_channel_id(guild_id).await;
+
+    if let Some(my_channel_id) = my_channel_id {
         if my_channel_id == voice_channel_id {
             let music = match manager.previous(guild_id).await {
                 Ok(v) => v,
@@ -45,6 +48,8 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
+        delete_player_message(context, interaction).await;
+
         Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }

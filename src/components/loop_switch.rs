@@ -4,6 +4,7 @@ use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
+use crate::utils::delete_player_message;
 use crate::{i18n::t, music::LoopMode, utils, PLAYER_MANAGER};
 
 /// Executes the `loop` command.
@@ -27,6 +28,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
     let player_state = manager
         .get_voice_channel_id(guild_id)
+        .await
         .zip(manager.get_loop_mode(guild_id));
 
     if let Some((my_channel_id, current_loop_mode)) = player_state {
@@ -47,6 +49,8 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
+        delete_player_message(context, interaction).await;
+
         Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }

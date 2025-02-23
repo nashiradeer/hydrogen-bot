@@ -2,7 +2,7 @@
 
 use crate::i18n::t;
 use beef::lean::Cow;
-use serenity::all::{ChannelId, Context, GuildId, UserId};
+use serenity::all::{ChannelId, ComponentInteraction, Context, GuildId, UserId};
 use songbird::Songbird;
 use std::sync::Arc;
 use tracing::{event, Level};
@@ -74,4 +74,11 @@ pub fn get_voice_channel<'a>(
     };
 
     Ok(voice_channel_id)
+}
+
+/// Deletes the old player message.
+pub async fn delete_player_message(context: &Context, interaction: &ComponentInteraction) {
+    if let Err(e) = interaction.message.delete(&context).await {
+        event!(Level::WARN, error = %e, "cannot delete old player message");
+    }
 }

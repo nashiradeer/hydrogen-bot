@@ -81,7 +81,7 @@ features = ["macros", "rt-multi-thread", "parking_lot"]
 
 [dependencies.tracing]
 version = "0.1.37"
-features = ["release_max_level_debug", "max_level_trace"]
+features = ["release_max_level_info", "max_level_trace"]
 
 [dependencies.tracing-subscriber]
 version = "0.3.17"

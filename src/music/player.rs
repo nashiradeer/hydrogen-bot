@@ -3,11 +3,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use serenity::all::{ChannelId, MessageId, ReactionType, UserId};
-use songbird::id::ChannelId as SongbirdChannelId;
-use songbird::ConnectionInfo;
 use tokio::task::JoinHandle;
-
-use crate::lavalink::VoiceState;
 
 #[derive(Debug)]
 /// Player information.
@@ -17,11 +13,9 @@ pub struct Player {
     /// The message ID of the player.
     pub message_id: Option<MessageId>,
     /// The queue of tracks.
-    pub primary_queue: Vec<Track>,
-    /// The secondary queue of tracks for PlayTogether.
-    pub _secondary_queue: Option<Vec<Track>>,
+    pub queue: Vec<Track>,
     /// The current track being played.
-    pub currrent_track: usize,
+    pub current_track: usize,
     /// The loop mode of the player.
     pub loop_mode: LoopMode,
     /// If the player is paused.
@@ -46,9 +40,8 @@ impl Player {
         Self {
             channel_id: Some(channel_id),
             message_id: None,
-            primary_queue: Vec::new(),
-            _secondary_queue: None,
-            currrent_track: 0,
+            queue: Vec::new(),
+            current_track: 0,
             loop_mode,
             paused,
             node_id,
@@ -92,7 +85,7 @@ impl From<&Player> for PlayerState {
             text_channel: player.channel_id,
             message_id: player.message_id,
             locale: player.locale.clone(),
-            track: player.primary_queue.get(player.currrent_track).cloned(),
+            track: player.queue.get(player.current_track).cloned(),
             node_id: player.node_id,
             loop_mode: player.loop_mode,
         }
@@ -101,8 +94,8 @@ impl From<&Player> for PlayerState {
 
 impl From<Player> for PlayerState {
     fn from(mut player: Player) -> Self {
-        let track = if player.primary_queue.len() > player.currrent_track {
-            Some(player.primary_queue.remove(player.currrent_track))
+        let track = if player.queue.len() > player.current_track {
+            Some(player.queue.remove(player.current_track))
         } else {
             None
         };
@@ -117,111 +110,6 @@ impl From<Player> for PlayerState {
             node_id: player.node_id,
             loop_mode: player.loop_mode,
         }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-/// Player connection information.
-pub struct PlayerConnection {
-    /// The session ID of the Discord voice connection.
-    pub session_id: Option<String>,
-    /// The token for the Discord voice connection.
-    pub token: Option<String>,
-    /// The endpoint for the Discord voice connection.
-    pub endpoint: Option<String>,
-    /// The voice channel where the player is connected.
-    pub channel_id: Option<SongbirdChannelId>,
-}
-
-impl PlayerConnection {
-    /// Create a new player connection.
-    pub fn _new(
-        session_id: &str,
-        token: &str,
-        endpoint: &str,
-        channel_id: SongbirdChannelId,
-    ) -> Self {
-        Self {
-            session_id: Some(session_id.to_owned()),
-            token: Some(token.to_owned()),
-            endpoint: Some(endpoint.to_owned()),
-            channel_id: Some(channel_id),
-        }
-    }
-
-    /// Set the session ID for the player connection.
-    pub fn set_session_id(mut self, session_id: &str) -> Self {
-        self.session_id = Some(session_id.to_owned());
-        self
-    }
-
-    /// Set the token for the player connection.
-    pub fn set_token(mut self, token: &str) -> Self {
-        self.token = Some(token.to_owned());
-        self
-    }
-
-    /// Set the endpoint for the player connection.
-    pub fn _set_endpoint(mut self, endpoint: &str) -> Self {
-        self.endpoint = Some(endpoint.to_owned());
-        self
-    }
-
-    /// Set the channel ID for the player connection.
-    pub fn set_channel_id(mut self, channel_id: SongbirdChannelId) -> Self {
-        self.channel_id = Some(channel_id);
-        self
-    }
-
-    /// Check if the player connection is ready.
-    pub fn is_ready(&self) -> bool {
-        self.session_id.is_some()
-            && self.token.is_some()
-            && self.endpoint.is_some()
-            && self.channel_id.is_some()
-    }
-
-    /// Get and convert channel ID to Serenity's ChannelId.
-    pub fn serenity_channel_id(&self) -> Option<ChannelId> {
-        self.channel_id.map(|id| ChannelId::new(id.0.into()))
-    }
-}
-
-impl From<&ConnectionInfo> for PlayerConnection {
-    fn from(info: &ConnectionInfo) -> Self {
-        Self {
-            channel_id: info.channel_id,
-            session_id: Some(info.session_id.clone()),
-            token: Some(info.token.clone()),
-            endpoint: Some(info.endpoint.clone()),
-        }
-    }
-}
-
-impl From<ConnectionInfo> for PlayerConnection {
-    fn from(info: ConnectionInfo) -> Self {
-        Self {
-            channel_id: info.channel_id,
-            session_id: Some(info.session_id),
-            token: Some(info.token),
-            endpoint: Some(info.endpoint),
-        }
-    }
-}
-
-impl TryInto<VoiceState> for PlayerConnection {
-    type Error = Self;
-
-    fn try_into(self) -> Result<VoiceState, Self> {
-        if self.session_id.is_none() || self.token.is_none() || self.endpoint.is_none() {
-            return Err(self);
-        }
-
-        Ok(VoiceState::new(
-            &self.token.unwrap(),
-            &self.endpoint.unwrap(),
-            &self.session_id.unwrap(),
-        ))
     }
 }
 
