@@ -16,6 +16,7 @@
 - Avoid RwLock and Mutex from tokio when possible in Hydrolink.
 - Change how the Lavalink REST client makes requests.
 - Get the VoiceState from the ConnectionInfo instead of storing it.
+- Set Stats and PlayerUpdate messages from Lavalink as debug or trace.
 - Use Cow<str> instead of String when possible.
 - Use dynfmt crate instead of `String::replace`.
 - Use Hydrogen's green instead of Discord's blue as primary color.
@@ -36,6 +37,8 @@
 
 - Default log level for the Docker images.
 - Queue component button from the player message.
+- Remove PlayTogether from the Music Player.
+- Strip debug and trace logs from the release build.
 
 ## [0.0.1-alpha.12] - 2025-01-18
 
