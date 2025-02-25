@@ -42,7 +42,7 @@ impl Rest {
         let client = Client::builder()
             .user_agent(LAVALINK_USER_AGENT)
             .default_headers(HeaderMap::from_iter(headers))
-            .read_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(60))
             .build()
             .map_err(Error::from)?;
 
