@@ -93,9 +93,10 @@ impl PlayerManager {
         guild_id: GuildId,
         text_channel: ChannelId,
         locale: &str,
+        player_template: PlayerTemplate,
     ) -> Result<()> {
         if !self.contains_player(guild_id) {
-            self.inner_init(guild_id, text_channel, locale).await?;
+            self.create_player(guild_id, text_channel, locale, player_template)?;
 
             if let Some(player) = self.get_player_state(guild_id) {
                 let (channel_id, message_id) = update_message(self, guild_id, &player, false).await;
@@ -110,24 +111,26 @@ impl PlayerManager {
         Ok(())
     }
 
-    /// Internal [Self::init] logic to be shared between methods.
-    async fn inner_init(
+    /// Create a player for the guild.
+    fn create_player(
         &self,
         guild_id: GuildId,
         text_channel: ChannelId,
         locale: &str,
+        template: PlayerTemplate,
     ) -> Result<()> {
         let node_id = self
             .lavalink
             .search_connected_node()
             .ok_or(Error::NoAvailableLavalink)?;
 
-        self.players
-            .insert(guild_id, Player::new_normal(node_id, locale, text_channel));
+        self.players.insert(
+            guild_id,
+            template.into_player(node_id, locale, text_channel),
+        );
 
         Ok(())
     }
-
     /// Check if the player exists for the guild.
     pub fn contains_player(&self, guild_id: GuildId) -> bool {
         self.players.contains_key(&guild_id)
@@ -208,11 +211,12 @@ impl PlayerManager {
         guild_id: GuildId,
         text_channel: ChannelId,
         locale: &str,
+        player_template: PlayerTemplate,
     ) -> Result<PlayResult> {
         let initializing = !self.contains_player(guild_id);
 
         if initializing {
-            self.inner_init(guild_id, text_channel, locale).await?;
+            self.create_player(guild_id, text_channel, locale, player_template)?;
         }
 
         let player_state = self
@@ -790,7 +794,7 @@ impl PlayerManager {
             }
             LoopMode::Single => (player.current_track, false),
             LoopMode::All => (player.current_track + 1 % player.queue.len(), false),
-            LoopMode::Autopause => {
+            LoopMode::AutoPause => {
                 if player.current_track + 1 >= player.queue.len() {
                     (player.queue.len() - 1, true)
                 } else {
