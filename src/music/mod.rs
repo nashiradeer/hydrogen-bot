@@ -401,6 +401,31 @@ impl PlayerManager {
         })
     }
 
+    /// Get the current playing time from the player.
+    pub async fn time(&self, guild_id: GuildId) -> Result<Option<SeekResult>> {
+        if !self.contains_player(guild_id) {
+            return Err(Error::PlayerNotFound);
+        }
+
+        let node_id = self
+            .players
+            .view(&guild_id, |_, p| p.node_id)
+            .ok_or(Error::PlayerNotFound)?;
+
+        let player = self
+            .lavalink
+            .get_player(node_id, &guild_id.to_string())
+            .await
+            .map_err(Error::from)?;
+
+        Ok(player.and_then(|p| {
+            p.track.map(|t| SeekResult {
+                position: t.info.position,
+                total: t.info.length,
+            })
+        }))
+    }
+
     /// Seek the player to a certain time.
     pub async fn seek(&self, guild_id: GuildId, time: Duration) -> Result<Option<SeekResult>> {
         if !self.contains_player(guild_id) {
@@ -420,10 +445,15 @@ impl PlayerManager {
             .await
             .map_err(Error::from)?;
 
+        let position = time.as_millis() as u64;
+
         Ok(player.track.map(|t| SeekResult {
-            position: t.info.position,
+            position: if position > t.info.length {
+                t.info.length
+            } else {
+                position
+            },
             total: t.info.length,
-            track: Track::from(t),
         }))
     }
 
