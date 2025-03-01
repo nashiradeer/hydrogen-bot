@@ -16,8 +16,8 @@ plugins:
     clients:
       - MUSIC
       - WEB
-      - ANDROID_VR
-      - WEBEMBEDDED
+      - TVHTML5EMBEDDED
+      - TV
 
   lavasrc:
     providers:
@@ -39,11 +39,11 @@ plugins:
       localFiles: false
     deezer:
       masterDecryptionKey: # Paste your master decryption key here
-      formats: ["MP3_128", "MP3_64"]
+      formats: [ "MP3_128", "MP3_64" ]
 
 lavalink:
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.5"
       repository: "https://maven.lavalink.dev/releases"
     - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
       repository: "https://maven.lavalink.dev/releases"
