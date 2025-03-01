@@ -205,10 +205,8 @@ pub struct PlayResult {
 #[derive(Debug, Clone)]
 /// Seek result information.
 pub struct SeekResult {
-    /// The track that was seeked.
-    pub track: Track,
-    /// The position of the track.
+    /// The position of the track in milliseconds.
     pub position: u64,
-    /// The total duration of the track.
+    /// The total duration of the track in milliseconds.
     pub total: u64,
 }
