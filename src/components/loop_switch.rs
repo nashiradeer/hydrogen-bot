@@ -39,7 +39,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
 
             let loop_type_translation_key = match new_loop_mode {
                 LoopMode::None => "loop.normal",
-                LoopMode::Autopause => "loop.pause",
+                LoopMode::AutoPause => "loop.pause",
                 LoopMode::Single => "loop.music",
                 LoopMode::All => "loop.queue",
             };

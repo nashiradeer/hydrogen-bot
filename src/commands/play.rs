@@ -6,6 +6,7 @@ use serenity::all::{
     GuildId,
 };
 use songbird::{Call, Songbird};
+use std::default::Default;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{event, Level};
@@ -104,6 +105,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 .guild_locale
                 .clone()
                 .unwrap_or(interaction.locale.clone()),
+            Default::default(),
         )
         .await
     {

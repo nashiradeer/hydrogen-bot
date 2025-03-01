@@ -10,7 +10,7 @@
   guild. ([#10](https://github.com/nashiradeer/hydrogen-bot/issues/10))
 - [x] Rework seek to show current time and total time when no arguments are provided.
 - [x] Rename seek to time.
-- [ ] Rework join to have templates for the Music Player.
+- [x] Rework join to have templates for the Music Player.
 - [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
 - [x] Remove PlayTogether from the Music Player.
 - [x] Filter Lavalink's Stats and PlayerUpdate messages from logs.
