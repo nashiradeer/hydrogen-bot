@@ -224,15 +224,15 @@ pub enum PlayerTemplate {
 impl PlayerTemplate {
     /// If the player should be paused by default.
     pub fn pause(&self) -> bool {
-        matches!(self, PlayerTemplate::Manual | PlayerTemplate::Rpg)
+        matches!(self, Self::Manual | Self::Rpg)
     }
 
     /// The loop mode for the player.
     pub fn loop_mode(&self) -> LoopMode {
         match self {
-            PlayerTemplate::Music | PlayerTemplate::Rpg => LoopMode::Single,
-            PlayerTemplate::Queue => LoopMode::All,
-            PlayerTemplate::Manual => LoopMode::AutoPause,
+            Self::Music | Self::Rpg => LoopMode::Single,
+            Self::Queue => LoopMode::All,
+            Self::Manual => LoopMode::AutoPause,
             _ => LoopMode::None,
         }
     }
