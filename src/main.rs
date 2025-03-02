@@ -86,10 +86,7 @@ async fn hydrogen() {
 
     let mut client = match Client::builder(
         &discord_token,
-        GatewayIntents::GUILDS
-            | GatewayIntents::GUILD_VOICE_STATES
-            | GatewayIntents::MESSAGE_CONTENT
-            | GatewayIntents::GUILD_MESSAGES,
+        GatewayIntents::GUILD_VOICE_STATES | GatewayIntents::GUILDS,
     )
     .event_handler(HydrogenHandler {
         lavalink_nodes: Mutex::new(Some(lavalink_nodes)),
