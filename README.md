@@ -41,8 +41,8 @@ default features or by removing the `simd-json` feature from the default feature
 You can configure Hydrogen using environment variables, here is a list of the available variables:
 
 - DISCORD_TOKEN: Sets the token that will be used to access Discord. (required)
-- LAVALINK: Sets the Lavalink hosts. (required, e.g. "localhost:2333@youshallnotpass" or "localhost:
-  2333@youshallnotpasslavalink:443@securepassword/tls")
+- LAVALINK: Sets the Lavalink hosts. (required, e.g. `localhost:2333@youshallnotpass` or
+  `localhost:2333@youshallnotpass;lavalink:443@securepassword/tls`)
 - DISABLE_MULTI_THREADING: Disables multi-threading. (optional, default: false)
 
 ## Credits
