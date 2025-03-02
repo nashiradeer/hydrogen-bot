@@ -16,6 +16,7 @@
 - Avoid RwLock and Mutex from tokio when possible in Hydrolink.
 - Change how the Lavalink REST client makes requests.
 - Implement player templates on `join` command.
+- Increase Hydrolink's REST read timeout to 60 seconds.
 - Get the VoiceState from the ConnectionInfo instead of storing it.
 - Maintain pause value from the Player creation.
 - Make time option on `time` command optional.
