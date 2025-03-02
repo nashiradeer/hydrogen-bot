@@ -49,11 +49,6 @@ impl Player {
             destroy_handle: None,
         }
     }
-
-    /// Create a new player with the settings for the normal player.
-    pub fn new_normal(node_id: usize, locale: &str, channel_id: ChannelId) -> Self {
-        Self::new(node_id, locale, channel_id, LoopMode::None, false)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,8 +118,8 @@ pub enum LoopMode {
     Single,
     /// Loop the queue.
     All,
-    /// Like [None], but autopausing the player.
-    Autopause,
+    /// Like [None], but automatically pauses after the track ends.
+    AutoPause,
 }
 
 impl LoopMode {
@@ -133,8 +128,8 @@ impl LoopMode {
         match self {
             LoopMode::None => LoopMode::Single,
             LoopMode::Single => LoopMode::All,
-            LoopMode::All => LoopMode::Autopause,
-            LoopMode::Autopause => LoopMode::None,
+            LoopMode::All => LoopMode::AutoPause,
+            LoopMode::AutoPause => LoopMode::None,
         }
     }
 }
@@ -145,7 +140,7 @@ impl Display for LoopMode {
             LoopMode::None => write!(f, "➡️"),
             LoopMode::Single => write!(f, "🔂"),
             LoopMode::All => write!(f, "🔁"),
-            LoopMode::Autopause => write!(f, "↩️"),
+            LoopMode::AutoPause => write!(f, "↩️"),
         }
     }
 }
@@ -205,10 +200,51 @@ pub struct PlayResult {
 #[derive(Debug, Clone)]
 /// Seek result information.
 pub struct SeekResult {
-    /// The track that was seeked.
-    pub track: Track,
-    /// The position of the track.
+    /// The position of the track in milliseconds.
     pub position: u64,
-    /// The total duration of the track.
+    /// The total duration of the track in milliseconds.
     pub total: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Templates for player creation.
+pub enum PlayerTemplate {
+    /// Default player with pause disabled and no loop.
+    Default,
+    /// Player for playing music with single loop.
+    Music,
+    /// Player for playing a queue with all loop.
+    Queue,
+    /// Player for manual control with automatic pause.
+    Manual,
+    /// Player for RPG music with single loop and paused by default.
+    Rpg,
+}
+
+impl PlayerTemplate {
+    /// If the player should be paused by default.
+    pub fn pause(&self) -> bool {
+        matches!(self, Self::Manual | Self::Rpg)
+    }
+
+    /// The loop mode for the player.
+    pub fn loop_mode(&self) -> LoopMode {
+        match self {
+            Self::Music | Self::Rpg => LoopMode::Single,
+            Self::Queue => LoopMode::All,
+            Self::Manual => LoopMode::AutoPause,
+            _ => LoopMode::None,
+        }
+    }
+
+    /// Convert the template into a player.
+    pub fn into_player(self, node_id: usize, locale: &str, channel_id: ChannelId) -> Player {
+        Player::new(node_id, locale, channel_id, self.loop_mode(), self.pause())
+    }
+}
+
+impl Default for PlayerTemplate {
+    fn default() -> Self {
+        Self::Default
+    }
 }
