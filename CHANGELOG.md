@@ -15,7 +15,12 @@
 - Avoid recalculations on pause component.
 - Avoid RwLock and Mutex from tokio when possible in Hydrolink.
 - Change how the Lavalink REST client makes requests.
+- Implement player templates on `join` command.
+- Increase Hydrolink's REST read timeout to 60 seconds.
 - Get the VoiceState from the ConnectionInfo instead of storing it.
+- Maintain pause value from the Player creation.
+- Make time option on `time` command optional.
+- Rename `seek` command to `time`.
 - Set Stats and PlayerUpdate messages from Lavalink as debug or trace.
 - Use Cow<str> instead of String when possible.
 - Use dynfmt crate instead of `String::replace`.
@@ -37,6 +42,8 @@
 
 - Default log level for the Docker images.
 - Queue component button from the player message.
+- Remove `GUILD_MESSAGES` intent.
+- Remove `MESSAGE_CONTENT` intent.
 - Remove PlayTogether from the Music Player.
 - Strip debug and trace logs from the release build.
 
