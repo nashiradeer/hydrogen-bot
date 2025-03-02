@@ -386,7 +386,6 @@ impl PlayerManager {
             }
 
             player.current_track = index;
-            player.paused = false;
 
             drop(player);
 
