@@ -11,6 +11,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{event, Level};
 
+use crate::i18n::t_all;
+use crate::music::{PlayMode, PlayRequest};
 use crate::{
     i18n::{
         serenity_command_description, serenity_command_name, serenity_command_option_description,
@@ -40,6 +42,18 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
     else {
         event!(Level::WARN, "no query provided");
         return Cow::borrowed(t(&interaction.locale, "error.unknown"));
+    };
+
+    let mode_option = interaction
+        .data
+        .options
+        .get(1)
+        .and_then(|v| v.value.as_str());
+
+    let mode = match mode_option {
+        Some("add_next") => PlayMode::AddToNext,
+        Some("play_now") => PlayMode::PlayNow,
+        _ => PlayMode::AddToEnd,
     };
 
     let (voice_manager, voice_channel_id) = match utils::get_voice_essentials(
@@ -95,20 +109,17 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         }
     }
 
-    let result = match manager
-        .play(
-            query,
-            interaction.user.id,
-            guild_id,
-            interaction.channel_id,
-            &interaction
-                .guild_locale
-                .clone()
-                .unwrap_or(interaction.locale.clone()),
-            Default::default(),
-        )
-        .await
-    {
+    let play_request = PlayRequest {
+        music: query,
+        requester: interaction.user.id,
+        guild_id,
+        text_channel: interaction.channel_id,
+        locale: &interaction.locale,
+        player_template: Default::default(),
+        play_mode: mode,
+    };
+
+    let result = match manager.play(play_request).await {
         Ok(e) => e,
         Err(e) => {
             event!(Level::ERROR, error = ?e, guild_id = %guild_id, "cannot play the track");
@@ -148,6 +159,26 @@ pub fn create_command() -> CreateCommand {
                 serenity_command_option_name("play.query_name", option);
             option = serenity_command_option_description(
                 "play.query_description",
+                option,
+            );
+
+            option
+        })
+        .add_option({
+            let mut option = CreateCommandOption::new(
+                CommandOptionType::String,
+                "mode",
+                "The mode to play the song in.",
+            )
+                .required(false)
+                .add_string_choice_localized("Add To End", "add_to_end", t_all("play.mode_end"))
+                .add_string_choice_localized("Add Next", "add_next", t_all("play.mode_next"))
+                .add_string_choice_localized("Play Now", "play_now", t_all("play.mode_now"));
+
+            option =
+                serenity_command_option_name("play.mode_name", option);
+            option = serenity_command_option_description(
+                "play.mode_description",
                 option,
             );
 
@@ -227,7 +258,7 @@ fn generate_message<'a>(result: PlayResult, interaction: &CommandInteraction) ->
                     t_vars(
                         &interaction.locale,
                         "play.play_multi_url",
-                        [track.title, track.author, result.count.to_string(), url,]
+                        [track.title, track.author, result.count.to_string(), url]
                     ),
                 ))
             } else {
@@ -237,7 +268,7 @@ fn generate_message<'a>(result: PlayResult, interaction: &CommandInteraction) ->
                     t_vars(
                         &interaction.locale,
                         "play.play_multi",
-                        [track.title, track.author, result.count.to_string(),]
+                        [track.title, track.author, result.count.to_string()]
                     ),
                 ))
             };

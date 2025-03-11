@@ -36,12 +36,15 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
         if my_channel_id == voice_channel_id {
             let new_paused = !paused;
 
-            if let Err(e) = manager.set_pause(guild_id, new_paused).await {
-                event!(Level::ERROR, error = ?e, pause = new_paused, "cannot resume/pause the player");
-                return Cow::borrowed(t(&interaction.locale, "error.unknown"));
-            }
+            let pause_result = match manager.set_pause(guild_id, new_paused).await {
+                Ok(v) => v,
+                Err(e) => {
+                    event!(Level::ERROR, error = ?e, pause = new_paused, "cannot resume/pause the player");
+                    return Cow::borrowed(t(&interaction.locale, "error.unknown"));
+                }
+            };
 
-            let translation_key = if new_paused {
+            let translation_key = if pause_result {
                 "pause.paused"
             } else {
                 "pause.resumed"

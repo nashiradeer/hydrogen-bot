@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add a function to get if the player is playing.
 - Add simd-json support on the Lavalink REST client.
 - Delete the player message when there's no player.
 - Use the member's avatar instead of the user's avatar on the player message.
@@ -16,12 +17,19 @@
 - Avoid RwLock and Mutex from tokio when possible in Hydrolink.
 - Change how the Lavalink REST client makes requests.
 - Implement player templates on `join` command.
+- Implement play modes (like play now, add next) on `play` command.
 - Increase Hydrolink's REST read timeout to 60 seconds.
 - Get the VoiceState from the ConnectionInfo instead of storing it.
 - Maintain pause value from the Player creation.
 - Make time option on `time` command optional.
+- `PlayerManager::next_track` no more pause or sync on the end of the queue.
+- `PlayerManager::pause` now returns the new pause value.
+- `PlayerManager::pause` resume and sync when the player isn't playing.
+- Refactor `PlayerManager::play` to be more modular.
+- Rename `PlayerManager::start_player` to `PlayerManager::sync`.
 - Rename `seek` command to `time`.
 - Set Stats and PlayerUpdate messages from Lavalink as debug or trace.
+- Show player as paused when it's not playing.
 - Use Cow<str> instead of String when possible.
 - Use dynfmt crate instead of `String::replace`.
 - Use Hydrogen's green instead of Discord's blue as primary color.

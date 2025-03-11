@@ -30,6 +30,7 @@ pub async fn update_message(
     manager: &PlayerManager,
     guild_id: GuildId,
     player: &PlayerState,
+    playing: bool,
     thinking: bool,
 ) -> (Option<ChannelId>, Option<MessageId>) {
     event!(
@@ -49,7 +50,7 @@ pub async fn update_message(
     let author = generate_author(manager, player, guild_id).await;
     // It's very cheaper to clone the author than re-generate it
     let author_clone = author.clone();
-    let components = generate_components(player, &state);
+    let components = generate_components(player, &state, playing);
 
     let thumbnail = if player.has_destroy_handle {
         None
@@ -99,7 +100,7 @@ pub async fn update_message(
             author_clone,
         );
 
-        let components = generate_components(player, &state);
+        let components = generate_components(player, &state, playing);
 
         return match channel_id
             .send_message(
@@ -241,13 +242,17 @@ async fn generate_author(
 }
 
 /// Generates the components for the player message.
-fn generate_components(player: &PlayerState, state: &PlayerMessageState) -> Vec<CreateActionRow> {
+fn generate_components(
+    player: &PlayerState,
+    state: &PlayerMessageState,
+    playing: bool,
+) -> Vec<CreateActionRow> {
     let main_row_style = match state.is_thinking() {
         true => ButtonStyle::Secondary,
         false => ButtonStyle::Primary,
     };
 
-    let pause_icon = match player.paused {
+    let pause_icon = match player.paused || !playing {
         true => '▶',
         false => '⏸',
     };
