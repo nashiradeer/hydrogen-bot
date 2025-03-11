@@ -11,7 +11,7 @@
 - [x] Rework seek to show current time and total time when no arguments are provided.
 - [x] Rename seek to time.
 - [x] Rework join to have templates for the Music Player.
-- [ ] Rework play to choose if the music should be played now, next or at the end of the queue.
+- [x] Rework play to choose if the music should be played now, next or at the end of the queue.
 - [x] Remove PlayTogether from the Music Player.
 - [x] Filter Lavalink's Stats and PlayerUpdate messages from logs.
 - [x] Use songbird ConnectionInfo instead of store VoiceState.

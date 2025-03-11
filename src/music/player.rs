@@ -2,8 +2,10 @@
 
 use std::fmt::{self, Display, Formatter};
 
-use serenity::all::{ChannelId, MessageId, ReactionType, UserId};
+use serenity::all::{ChannelId, GuildId, MessageId, ReactionType, UserId};
 use tokio::task::JoinHandle;
+
+use crate::lavalink::Track as LavalinkTrack;
 
 #[derive(Debug)]
 /// Player information.
@@ -170,8 +172,23 @@ pub struct Track {
     pub thumbnail: Option<String>,
 }
 
-impl From<crate::lavalink::Track> for Track {
-    fn from(track: crate::lavalink::Track) -> Self {
+impl Track {
+    /// Create a new track.
+    pub fn from_track(track: LavalinkTrack, requester: UserId) -> Self {
+        Self {
+            track: track.encoded,
+            title: track.info.title,
+            author: track.info.author,
+            requester,
+            duration: track.info.length,
+            url: track.info.uri,
+            thumbnail: track.info.artwork_url,
+        }
+    }
+}
+
+impl From<LavalinkTrack> for Track {
+    fn from(track: LavalinkTrack) -> Self {
         Self {
             track: track.encoded,
             title: track.info.title,
@@ -195,6 +212,18 @@ pub struct PlayResult {
     pub playing: bool,
     /// If the queue was truncated.
     pub truncated: bool,
+}
+
+impl PlayResult {
+    /// Merge the results of adding tracks and syncing the player.
+    pub fn merge(add_queue_result: AddQueueResult, sync_result: SyncResult) -> Self {
+        Self {
+            track: sync_result.track,
+            count: add_queue_result.count,
+            playing: sync_result.playing,
+            truncated: add_queue_result.truncated,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -247,4 +276,85 @@ impl Default for PlayerTemplate {
     fn default() -> Self {
         Self::Default
     }
+}
+
+#[derive(Debug, Clone)]
+/// Result of fetching tracks.
+pub struct FetchResult {
+    /// The selected track.
+    pub selected: Option<usize>,
+    /// The tracks fetched.
+    pub tracks: Vec<LavalinkTrack>,
+}
+
+#[derive(Debug, Clone)]
+/// Result of adding tracks to the queue.
+pub struct AddQueueResult {
+    /// The track index that was selected to be played.
+    pub selected: Option<usize>,
+    /// The index of the first track added.
+    pub first_track_index: usize,
+    /// The amount of tracks that were added.
+    pub count: usize,
+    /// If the queue was truncated.
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Operation to add tracks to the queue.
+pub enum AddQueueOperation {
+    /// Add the track to the end of the queue.
+    End,
+    /// Add the track to next of the current track.
+    Next,
+}
+
+impl Default for AddQueueOperation {
+    fn default() -> Self {
+        Self::End
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Result of syncing the player.
+pub struct SyncResult {
+    /// The track that will be played.
+    pub track: Option<Track>,
+    /// If the player has started playing.
+    pub playing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The mode to play the track.
+pub enum PlayMode {
+    /// Add the track to the end of the queue.
+    AddToEnd,
+    /// Add the track to the next of the current track.
+    AddToNext,
+    /// Play the track now.
+    PlayNow,
+}
+
+impl Default for PlayMode {
+    fn default() -> Self {
+        Self::AddToEnd
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PlayRequest<'a> {
+    /// The track to play.
+    pub music: &'a str,
+    /// The requester of the track.
+    pub requester: UserId,
+    /// The guild ID of the player.
+    pub guild_id: GuildId,
+    /// The text channel of the player.
+    pub text_channel: ChannelId,
+    /// Locale for the player's messages.
+    pub locale: &'a str,
+    /// The player template to use.
+    pub player_template: PlayerTemplate,
+    /// The mode to play the track.
+    pub play_mode: PlayMode,
 }

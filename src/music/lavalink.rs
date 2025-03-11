@@ -99,7 +99,7 @@ async fn process_message(
         }
 
         for player_key in restart_player_list {
-            if let Err(e) = player_manager.start_player(player_key).await {
+            if let Err(e) = player_manager.sync(player_key).await {
                 event!(
                     Level::ERROR,
                     guild_id = %player_key,
