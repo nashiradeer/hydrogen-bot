@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.1-alpha.13] - 2025-03-11
+
 ### Added
 
 - Add a function to get if the player is playing.
