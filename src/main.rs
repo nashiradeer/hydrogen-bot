@@ -1,25 +1,21 @@
-use std::{
-    collections::HashMap,
-    env,
-    process::exit,
-    sync::{Arc, LazyLock, OnceLock},
-    time::Instant,
-};
-
-use dashmap::DashMap;
-use handler::{handle_command, handle_component, register_commands, AutoRemoverKey};
+use handler::{handle_command, handle_component, register_commands};
 use lavalink::{cluster::Cluster, Rest};
 use music::PlayerManager;
 use parking_lot::Mutex;
 use serenity::{
     all::{
-        Client, CommandId, ComponentInteraction, GatewayIntents, Interaction, Ready,
-        VoiceServerUpdateEvent, VoiceState,
+        Client, CommandId, GatewayIntents, Interaction, Ready, VoiceServerUpdateEvent, VoiceState,
     },
     client::{Context, EventHandler},
 };
 use songbird::SerenityInit;
-use tokio::task::JoinHandle;
+use std::{
+    collections::HashMap,
+    env,
+    process::exit,
+    sync::{Arc, OnceLock},
+    time::Instant,
+};
 use tracing::{event, instrument, Level};
 use tracing_subscriber::{
     fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
@@ -32,7 +28,8 @@ mod commands;
 mod components;
 mod handler;
 mod i18n;
-pub mod lavalink;
+#[allow(dead_code)]
+mod lavalink;
 mod music;
 mod utils;
 
@@ -41,11 +38,6 @@ pub static LOADED_COMMANDS: OnceLock<HashMap<String, CommandId>> = OnceLock::new
 
 /// Hydrogen's Player Manager.
 pub static PLAYER_MANAGER: OnceLock<PlayerManager> = OnceLock::new();
-
-/// The messages from the components.
-pub static COMPONENTS_MESSAGES: LazyLock<
-    DashMap<AutoRemoverKey, (JoinHandle<()>, ComponentInteraction)>,
-> = LazyLock::new(DashMap::new);
 
 /// The program's entry point.
 fn main() {
@@ -94,10 +86,7 @@ async fn hydrogen() {
 
     let mut client = match Client::builder(
         &discord_token,
-        GatewayIntents::GUILDS
-            | GatewayIntents::GUILD_VOICE_STATES
-            | GatewayIntents::MESSAGE_CONTENT
-            | GatewayIntents::GUILD_MESSAGES,
+        GatewayIntents::GUILD_VOICE_STATES | GatewayIntents::GUILDS,
     )
     .event_handler(HydrogenHandler {
         lavalink_nodes: Mutex::new(Some(lavalink_nodes)),
@@ -200,30 +189,30 @@ impl EventHandler for HydrogenHandler {
         }
     }
 
-    #[instrument(skip_all, fields(interaction.id = %interaction.id(), interaction.kind = ?interaction.kind()))]
-    /// Handles the interaction create event.
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        event!(Level::DEBUG, "handling interaction...");
+    #[instrument(skip_all, fields(guild_id = ?voice_server.guild_id.map(|v| v.get())))]
+    /// Handles the voice server update event.
+    async fn voice_server_update(&self, _ctx: Context, voice_server: VoiceServerUpdateEvent) {
+        event!(Level::DEBUG, "updating voice server...");
         let init_time = Instant::now();
 
-        match interaction {
-            Interaction::Command(command) => handle_command(&ctx, &command).await,
-            Interaction::Component(component) => handle_component(&ctx, &component).await,
-            _ => (),
+        if let Some(manager) = PLAYER_MANAGER.get() {
+            if let Err(e) = manager.update_voice_server(voice_server).await {
+                event!(Level::ERROR, error = ?e, "cannot update the voice server");
+            }
         }
 
         let exec_time = init_time.elapsed();
-        if exec_time > utils::constants::HYDROGEN_INTERACTION_CREATE_THRESHOLD {
+        if exec_time > HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD {
             event!(
                 Level::WARN,
                 time = ?exec_time,
-                "handling the interaction took too long"
+                "updating the voice server took too long"
             );
         } else {
             event!(
                 Level::INFO,
                 time = ?exec_time,
-                "interaction handled"
+                "voice server updated"
             );
         }
     }
@@ -256,30 +245,30 @@ impl EventHandler for HydrogenHandler {
         }
     }
 
-    #[instrument(skip_all, fields(guild_id = ?voice_server.guild_id.map(|v| v.get())))]
-    /// Handles the voice server update event.
-    async fn voice_server_update(&self, _ctx: Context, voice_server: VoiceServerUpdateEvent) {
-        event!(Level::DEBUG, "updating voice server...");
+    #[instrument(skip_all, fields(interaction.id = %interaction.id(), interaction.kind = ?interaction.kind()))]
+    /// Handles the interaction create event.
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        event!(Level::DEBUG, "handling interaction...");
         let init_time = Instant::now();
 
-        if let Some(manager) = PLAYER_MANAGER.get() {
-            if let Err(e) = manager.update_voice_server(voice_server).await {
-                event!(Level::ERROR, error = ?e, "cannot update the voice server");
-            }
+        match interaction {
+            Interaction::Command(command) => handle_command(&ctx, &command).await,
+            Interaction::Component(component) => handle_component(&ctx, &component).await,
+            _ => (),
         }
 
         let exec_time = init_time.elapsed();
-        if exec_time > HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD {
+        if exec_time > utils::constants::HYDROGEN_INTERACTION_CREATE_THRESHOLD {
             event!(
                 Level::WARN,
                 time = ?exec_time,
-                "updating the voice server took too long"
+                "handling the interaction took too long"
             );
         } else {
             event!(
                 Level::INFO,
                 time = ?exec_time,
-                "voice server updated"
+                "interaction handled"
             );
         }
     }

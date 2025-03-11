@@ -7,12 +7,12 @@ use serenity::all::GuildId;
 use tokio::time::sleep;
 use tracing::{event, instrument, span, Instrument, Level};
 
+use super::PlayerManager;
+use crate::lavalink::MessageKind;
 use crate::{
     lavalink::{cluster::Cluster, Event, Message},
     utils::constants::{HYDROGEN_LAVALINK_EVENT_THRESHOLD, LAVALINK_RECONNECTION_DELAY},
 };
-
-use super::PlayerManager;
 
 /// Handle the Lavalink events.
 pub fn handle_lavalink(player_manager: PlayerManager) {
@@ -34,6 +34,19 @@ async fn process_message(
     node_id: usize,
     message: Option<Result<Message, crate::lavalink::Error>>,
 ) {
+    let spammy_message = message
+        .as_ref()
+        .map(|s| {
+            s.as_ref()
+                .map(|v| {
+                    let kind = v.kind();
+
+                    kind == MessageKind::Stats || kind == MessageKind::PlayerUpdate
+                })
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+
     event!(Level::DEBUG, "handling Lavalink message");
     let init_time = Instant::now();
 
@@ -64,7 +77,7 @@ async fn process_message(
             let player_value = player.value_mut();
 
             if player_value.node_id == node_id {
-                if let Some(node_id) = player_manager.lavalink.search_connected_node().await {
+                if let Some(node_id) = player_manager.lavalink.search_connected_node() {
                     event!(
                         Level::DEBUG,
                         old_node = player_value.node_id,
@@ -86,7 +99,7 @@ async fn process_message(
         }
 
         for player_key in restart_player_list {
-            if let Err(e) = player_manager.start_player(player_key).await {
+            if let Err(e) = player_manager.sync(player_key).await {
                 event!(
                     Level::ERROR,
                     guild_id = %player_key,
@@ -112,9 +125,15 @@ async fn process_message(
             time = ?exec_time,
             "handling the Lavalink event took too long"
         );
-    } else {
+    } else if !spammy_message {
         event!(
             Level::INFO,
+            time = ?exec_time,
+            "Lavalink event handled"
+        );
+    } else {
+        event!(
+            Level::DEBUG,
             time = ?exec_time,
             "Lavalink event handled"
         );

@@ -1,5 +1,62 @@
 # Hydrogen // Changelog
 
+## [Unreleased]
+
+## [0.0.1-alpha.13] - 2025-03-11
+
+### Added
+
+- Add a function to get if the player is playing.
+- Add simd-json support on the Lavalink REST client.
+- Delete the player message when there's no player.
+- Use the member's avatar instead of the user's avatar on the player message.
+- Send a follow-up message when it's not possible defer or edit an interaction.
+
+### Changed
+
+- Add Spotify as the default search provider.
+- Avoid recalculations on pause component.
+- Avoid RwLock and Mutex from tokio when possible in Hydrolink.
+- Change how the Lavalink REST client makes requests.
+- Implement player templates on `join` command.
+- Implement play modes (like play now, add next) on `play` command.
+- Increase Hydrolink's REST read timeout to 60 seconds.
+- Get the VoiceState from the ConnectionInfo instead of storing it.
+- Maintain pause value from the Player creation.
+- Make time option on `time` command optional.
+- `PlayerManager::next_track` no more pause or sync on the end of the queue.
+- `PlayerManager::pause` now returns the new pause value.
+- `PlayerManager::pause` resume and sync when the player isn't playing.
+- Refactor `PlayerManager::play` to be more modular.
+- Rename `PlayerManager::start_player` to `PlayerManager::sync`.
+- Rename `seek` command to `time`.
+- Set Stats and PlayerUpdate messages from Lavalink as debug or trace.
+- Show player as paused when it's not playing.
+- Use Cow<str> instead of String when possible.
+- Use dynfmt crate instead of `String::replace`.
+- Use Hydrogen's green instead of Discord's blue as primary color.
+- Use moka crate for caching old messages to deletion.
+- Use parking_lot in Hydrolink instead of std.
+- Use plain text instead of embeds for responses.
+- Update dependencies.
+- Update to Rust 1.84.1.
+
+### Fixed
+
+- Pause icon is inverted on the player message.
+- Play command is only returning the current track instead of the new one.
+- Thumbnail is appearing when player has a destroy handle.
+- Typo in Severity enum (Suspicous -> Suspicious).
+
+### Removed
+
+- Default log level for the Docker images.
+- Queue component button from the player message.
+- Remove `GUILD_MESSAGES` intent.
+- Remove `MESSAGE_CONTENT` intent.
+- Remove PlayTogether from the Music Player.
+- Strip debug and trace logs from the release build.
+
 ## [0.0.1-alpha.12] - 2025-01-18
 
 ### Added
@@ -11,16 +68,19 @@
 - Change Lavalink configuration to the new database URL-like format.
 - Implement a database URL-like configuration for Lavalink.
 - Implement cluster support in the Lavalink client.
-- Refactor the player and it manager.
+- Refactor the player and its manager.
 - Reimplement the Lavalink client using v4 API.
-- Reimplement the Lavalink client to use Enum-returning functions (like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
+- Reimplement the Lavalink client to use Enum-returning functions (
+  like [tungstenite](https://docs.rs/tungstenite/latest/tungstenite/protocol/struct.WebSocket.html#method.read)) instead
+  of Handler trait (like [serenity](https://docs.rs/serenity/latest/serenity/client/trait.EventHandler.html)).
 - Update to Alpine 3.21.
 - Update to Rust 1.84.0.
 - Update the dependencies.
 
 ### Fixed
 
-- Wrong play command message for playing = true and count > 1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
+- Wrong play command message for playing = true and count >
+    1. ([#12](https://github.com/nashiradeer/hydrogen-bot/issues/12))
 
 ### Removed
 
@@ -77,7 +137,8 @@
 - Add an option to force auto-roll from messages.
 - Add a warning about the public instance ending.
 - Add Portuguese Brazil translation to the public instance warning.
-- Disable auto-roll from messages when another roll bot is detected. ([#40](https://github.com/nashiradeer/hydrogen/issues/40))
+- Disable auto-roll from messages when another roll bot is
+  detected. ([#40](https://github.com/nashiradeer/hydrogen/issues/40))
 
 ### Fixed
 

@@ -1,80 +1,62 @@
 //! 'pause' component execution.
 
+use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
 use tracing::{event, Level};
 
-use crate::{
-    handler::{Response, ResponseType},
-    PLAYER_MANAGER,
-};
+use crate::i18n::t;
+use crate::utils::delete_player_message;
+use crate::{utils, PLAYER_MANAGER};
 
 /// Executes the `pause` command.
-pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Response<'a> {
-    let guild_id = match interaction.guild_id {
-        Some(v) => v,
-        None => {
-            event!(Level::WARN, "interaction.guild_id is None");
-            return Response::new(
-                "pause.embed_title",
-                "error.not_in_guild",
-                ResponseType::Error,
-            );
-        }
+pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Cow<'a, str> {
+    let Some(guild_id) = interaction.guild_id else {
+        event!(Level::WARN, "interaction.guild_id is None");
+        return Cow::borrowed(t(&interaction.locale, "error.not_in_guild"));
     };
 
-    let manager = match PLAYER_MANAGER.get() {
-        Some(v) => v,
-        None => {
-            event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
-            return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
-        }
+    let Some(manager) = PLAYER_MANAGER.get() else {
+        event!(Level::ERROR, "PLAYER_MANAGER.get() returned None");
+        return Cow::borrowed(t(&interaction.locale, "error.unknown"));
     };
 
-    let Some(voice_channel_id) = context.cache.guild(guild_id).and_then(|guild| {
-        guild
-            .voice_states
-            .get(&interaction.user.id)
-            .and_then(|voice_state| voice_state.channel_id)
-    }) else {
-        event!(Level::INFO, "user voice state is None");
-        return Response::new(
-            "pause.embed_title",
-            "error.unknown_voice_state",
-            ResponseType::Error,
-        );
-    };
+    let voice_channel_id =
+        match utils::get_voice_channel(context, &interaction.locale, guild_id, interaction.user.id)
+        {
+            Ok(v) => v,
+            Err(e) => return e,
+        };
 
     let player_state = manager
         .get_voice_channel_id(guild_id)
+        .await
         .zip(manager.get_pause(guild_id));
 
     if let Some((my_channel_id, paused)) = player_state {
         if my_channel_id == voice_channel_id {
-            // Pause or resume the player.
-            if let Err(e) = manager.set_pause(guild_id, !paused).await {
-                event!(Level::ERROR, error = ?e, pause = !paused, "cannot resume/pause the player");
-                return Response::new("pause.embed_title", "error.unknown", ResponseType::Error);
-            }
+            let new_paused = !paused;
 
-            let translation_key = if !paused {
+            let pause_result = match manager.set_pause(guild_id, new_paused).await {
+                Ok(v) => v,
+                Err(e) => {
+                    event!(Level::ERROR, error = ?e, pause = new_paused, "cannot resume/pause the player");
+                    return Cow::borrowed(t(&interaction.locale, "error.unknown"));
+                }
+            };
+
+            let translation_key = if pause_result {
                 "pause.paused"
             } else {
                 "pause.resumed"
             };
 
-            Response::new("pause.embed_title", translation_key, ResponseType::Success)
+            Cow::borrowed(t(&interaction.locale, translation_key))
         } else {
-            Response::new(
-                "pause.embed_title",
-                "error.not_in_voice_channel",
-                ResponseType::Error,
-            )
+            Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
-        Response::new(
-            "pause.embed_title",
-            "error.player_not_exists",
-            ResponseType::Error,
-        )
+        delete_player_message(context, interaction).await;
+
+        Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }
 }

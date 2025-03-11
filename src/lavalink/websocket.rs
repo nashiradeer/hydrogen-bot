@@ -1,6 +1,7 @@
-use std::{borrow::Borrow, ops::Deref, sync::RwLock};
+use std::{borrow::Borrow, ops::Deref};
 
 use futures::StreamExt;
+use parking_lot::RwLock;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::{
@@ -35,24 +36,13 @@ impl Lavalink {
 
     /// Connect to a Lavalink server.
     pub async fn connect_from(rest: Rest, user_id: &str) -> Result<Self> {
-        Ok(Self::new(
-            connect(rest.host(), rest.password(), rest.tls(), user_id).await?,
-            rest,
-            user_id,
-        ))
+        Ok(Self::new(connect(&rest, user_id).await?, rest, user_id))
     }
 
     /// Reconnect to a Lavalink server, resuming a previous session.
     pub async fn resume_from(rest: Rest, user_id: &str, session_id: &str) -> Result<Self> {
         Ok(Self::new(
-            resume_session(
-                rest.host(),
-                rest.password(),
-                rest.tls(),
-                user_id,
-                session_id,
-            )
-            .await?,
+            resume_session(&rest, user_id, session_id).await?,
             rest,
             user_id,
         ))
@@ -62,8 +52,7 @@ impl Lavalink {
     ///
     /// WARNING: This method locks the internal connection mutex.
     pub async fn connect(&self) -> Result<()> {
-        *self.connection.lock().await =
-            connect(self.host(), self.password(), self.tls(), &self.user_id).await?;
+        *self.connection.lock().await = connect(self, &self.user_id).await?;
 
         Ok(())
     }
@@ -73,9 +62,7 @@ impl Lavalink {
     /// WARNING: This method locks the internal connection mutex.
     pub async fn resume(&self) -> Result<()> {
         *self.connection.lock().await = resume_session(
-            self.host(),
-            self.password(),
-            self.tls(),
+            self,
             &self.user_id,
             self.session_id().as_ref().ok_or(Error::NoSessionId)?,
         )
@@ -90,8 +77,10 @@ impl Lavalink {
     }
 
     /// Get the session ID.
+    ///
+    /// This method clones the session ID to avoid locking the internal mutex.
     pub fn session_id(&self) -> Option<String> {
-        self.session_id.read().unwrap().clone()
+        self.session_id.read().clone()
     }
 
     /// Get the REST client.
@@ -101,37 +90,40 @@ impl Lavalink {
 
     /// Get all players in the session.
     pub async fn get_players(&self) -> Result<Vec<Player>> {
-        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
-
-        self.client.get_players(&session_id).await
+        self.client
+            .get_players(&self.session_id().ok_or(Error::NoSessionId)?)
+            .await
     }
 
     /// Get the player in the session.
     pub async fn get_player(&self, guild_id: &str) -> Result<Option<Player>> {
-        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
-
-        self.client.get_player(&session_id, guild_id).await
+        self.client
+            .get_player(&self.session_id().ok_or(Error::NoSessionId)?, guild_id)
+            .await
     }
 
     /// Update the player in the session.
     pub async fn update_player(
         &self,
         guild_id: &str,
-        player: UpdatePlayer,
+        player: &UpdatePlayer,
         no_replace: bool,
     ) -> Result<Player> {
-        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
-
         self.client
-            .update_player(&session_id, guild_id, player, no_replace)
+            .update_player(
+                &self.session_id().ok_or(Error::NoSessionId)?,
+                guild_id,
+                player,
+                no_replace,
+            )
             .await
     }
 
     /// Destroy the player in the session.
     pub async fn destroy_player(&self, guild_id: &str) -> Result<()> {
-        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
-
-        self.client.destroy_player(&session_id, guild_id).await
+        self.client
+            .destroy_player(&self.session_id().ok_or(Error::NoSessionId)?, guild_id)
+            .await
     }
 
     /// Update the session.
@@ -139,9 +131,9 @@ impl Lavalink {
         &self,
         session: &UpdateSessionRequest,
     ) -> Result<UpdateSessionResponse> {
-        let session_id = self.session_id().ok_or(Error::NoSessionId)?;
-
-        self.client.update_session(&session_id, session).await
+        self.client
+            .update_session(&self.session_id().ok_or(Error::NoSessionId)?, session)
+            .await
     }
 
     /// Receive the next message from the Lavalink server.
@@ -151,7 +143,7 @@ impl Lavalink {
         let data = parse_message(self.connection.lock().await.next().await?);
 
         if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
-            *self.session_id.write().unwrap() = Some(msg.session_id.clone());
+            *self.session_id.write() = Some(msg.session_id.clone());
         }
 
         Some(data)
