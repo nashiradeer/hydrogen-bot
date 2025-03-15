@@ -1,6 +1,6 @@
 //! English (United States) translations.
 
-use phf::{phf_map, Map};
+use phf::{Map, phf_map};
 
 // This macro generates a static map with the translations.
 pub static TRANSLATIONS: Map<&'static str, &'static str> = phf_map! {
@@ -60,4 +60,5 @@ pub static TRANSLATIONS: Map<&'static str, &'static str> = phf_map! {
     "time.time_description" => "Time in seconds or a supported syntax.",
     "time.invalid_syntax" => "Invalid time time syntax. You can use numbers as seconds or suffix them with `m` to be minutes or `h` to be hours. You can also use `00:00` or `00:00:00` to set the hours.",
     "time.result" => "``{0}/{1}``\n{2}",
+    "shuffle.result" => "The queue has been shuffled.",
 };

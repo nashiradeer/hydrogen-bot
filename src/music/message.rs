@@ -3,7 +3,7 @@ use serenity::all::{
     ButtonStyle, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor,
     CreateMessage, EditMessage, GuildId, MessageId, ReactionType,
 };
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 use crate::{
     i18n::{t, t_vars},
@@ -23,7 +23,7 @@ const DISABLE_STOP: bool = false;
 /// Whether to disable the loop button.
 const DISABLE_LOOP: bool = false;
 /// Whether to disable the shuffle button.
-const DISABLE_SHUFFLE: bool = true;
+const DISABLE_SHUFFLE: bool = false;
 
 /// Updates the player message.
 pub async fn update_message(

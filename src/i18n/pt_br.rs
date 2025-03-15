@@ -1,6 +1,6 @@
 //! Brazilian Portuguese translations.
 
-use phf::{phf_map, Map};
+use phf::{Map, phf_map};
 
 // This macro generates a static map with the translations.
 pub static TRANSLATIONS: Map<&'static str, &'static str> = phf_map! {
@@ -60,4 +60,5 @@ pub static TRANSLATIONS: Map<&'static str, &'static str> = phf_map! {
     "time.time_description" => "Tempo em segundos ou sintaxe suportada.",
     "time.invalid_syntax" => "Sintaxe de tempo inválida. Você pode usar números como segundos ou sufixa-los com `m` para minutos ou `h` para horas. Você também pode usar `00:00` ou `00:00:00` para definir as horas.",
     "time.result" => "``{0}/{1}``\n{2}",
+    "shuffle.result" => "A fila foi embaralhada.",
 };

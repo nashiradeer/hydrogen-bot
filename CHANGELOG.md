@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Implement `PlayerManager::shuffle` method.
+- Implement the shuffle component.
+
 ### Changed
 
+- Enable the `shuffle` component on the player message.
 - Pin the Debian Image on `bookworm-20250224-slim`.
 - Update Alpine Image to 3.21.3.
 - Update dependencies to the latest compatible versions.

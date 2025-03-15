@@ -9,6 +9,7 @@ use tracing::error;
 mod loop_switch;
 mod pause;
 mod prev;
+mod shuffle;
 mod skip;
 mod stop;
 
@@ -22,6 +23,7 @@ pub async fn execute<'a>(
         "prev" => prev::execute(context, component).await,
         "skip" => skip::execute(context, component).await,
         "stop" => stop::execute(context, component).await,
+        "shuffle" => shuffle::execute(context, component).await,
         _ => {
             error!(
                 "(components::execute): unknown component: {}",
