@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Pin the Debian Image on `bookworm-20250224-slim`.
+- Update Alpine Image to 3.21.3.
+- Update dependencies to the latest compatible versions.
+- Update `http` to 1.3.1.
+- Update `songbird` to 0.5.0.
+- Update to Rust 1.85.0.
+- Update to Rust 2024 Edition.
+
 ## [0.0.1-alpha.13] - 2025-03-11
 
 ### Added

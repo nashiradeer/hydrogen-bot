@@ -1,4 +1,4 @@
-FROM rust:1.84.1-slim-bookworm AS builder
+FROM rust:1.85.0-slim-bookworm AS builder
 RUN apt-get update -y && apt-get upgrade -y
 WORKDIR /app
 COPY src/ src/
@@ -6,7 +6,7 @@ COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 RUN cargo build -r
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-20250224-slim
 RUN apt update -y && apt upgrade -y
 WORKDIR /app
 COPY --from=builder /app/target/release/hydrogen hydrogen
