@@ -12,17 +12,17 @@ supports [Dev Containers](https://containers.dev). But before you enter the Dev 
 the [development guide](dev/README.md) to understand how to configure the development environment.
 
 If you are using JetBrains IDEs, unfortunately, Dev Containers support is very limited, so it is recommended to develop
-on the host machine instead using Rust 1.84.1.
+on the host machine instead using Rust 1.85.0.
 
 ## Using
 
 Hydrogen is available on
 our [GitHub Container Registry](https://github.com/nashiradeer/hydrogen-bot/pkgs/container/hydrogen-bot), you can use it
 by running
-`docker run -e DISCORD_TOKEN=your_token -e LAVALINK=your_lavalink_host ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.13-alpine`
+`docker run -e DISCORD_TOKEN=your_token -e LAVALINK=your_lavalink_host ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.14-alpine`
 in a terminal with [Docker](https://docker.com) installed and running, replacing `your_token` with your Discord bot
 token and `your_lavalink_host` with your Lavalink host. You can also use the Debian variant by replacing
-`ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.13-alpine` with `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.13-debian`.
+`ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.14-alpine` with `ghcr.io/nashiradeer/hydrogen-bot:0.0.1-alpha.14-debian`.
 
 ## Building
 

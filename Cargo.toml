@@ -1,9 +1,9 @@
 [package]
 name = "hydrogen"
-version = "0.0.1-alpha.13"
+version = "0.0.1-alpha.14"
 authors = ["Nashira Deer <nashiradeer@gmail.com>"]
-edition = "2021"
-rust-version = "1.84.1"
+edition = "2024"
+rust-version = "1.85.0"
 description = "Discord music bot powered by Lavalink and focusing on performance, features, usability and practicality."
 readme = "README.md"
 keywords = ["discord", "lavalink", "music"]
@@ -11,12 +11,12 @@ publish = false
 
 [features]
 default = ["simd-json"]
-simd-json = ["songbird/simd-json", "serenity/simd_json", "dep:simd-json"]
+simd-json = ["serenity/simd_json", "dep:simd-json"]
 
 [dependencies]
 dashmap = "6.1.0"
 futures = "0.3.31"
-http = "1.2.0"
+http = "1.3.1"
 parking_lot = "0.12.3"
 regex = "1.11.1"
 serde_json = "1.0.136"
@@ -71,7 +71,7 @@ optional = true
 features = ["beef"]
 
 [dependencies.songbird]
-version = "0.4.3"
+version = "0.5.0"
 default-features = false
 features = ["gateway", "serenity", "rustls"]
 
