@@ -7,7 +7,7 @@ mod player;
 use message::update_message;
 pub use player::*;
 use tokio::time::sleep;
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 use std::{
     error::Error as StdError,
@@ -18,18 +18,19 @@ use std::{
 };
 
 use crate::{
-    lavalink::{cluster::Cluster, LoadResult, Rest, UpdatePlayer, UpdatePlayerTrack, VoiceState},
+    lavalink::{LoadResult, Rest, UpdatePlayer, UpdatePlayerTrack, VoiceState, cluster::Cluster},
     utils::constants::{
         HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
     },
 };
 use dashmap::DashMap;
 use lavalink::{handle_lavalink, reconnect_node};
+use rand::prelude::SliceRandom;
 use serenity::all::{
     Cache, CacheHttp, ChannelId, ChannelType, GuildId, Http, UserId, VoiceServerUpdateEvent,
     VoiceState as SerenityVoiceState,
 };
-use songbird::{error::JoinError, Songbird};
+use songbird::{Songbird, error::JoinError};
 
 #[derive(Debug, Clone)]
 /// The player manager.
@@ -951,6 +952,26 @@ impl PlayerManager {
                 ..p
             });
         }
+    }
+
+    /// Shuffle the player's queue.
+    pub fn shuffle(&self, guild_id: GuildId) -> Result<()> {
+        let mut player = self
+            .players
+            .get_mut(&guild_id)
+            .ok_or(Error::PlayerNotFound)?;
+
+        let old_index = player.current_track;
+
+        let current_track = player.queue.swap_remove(old_index);
+
+        player.queue.shuffle(&mut rand::rng());
+
+        player.queue.insert(0, current_track);
+
+        player.current_track = 0;
+
+        Ok(())
     }
 }
 

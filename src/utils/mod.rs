@@ -5,7 +5,7 @@ use beef::lean::Cow;
 use serenity::all::{ChannelId, ComponentInteraction, Context, GuildId, UserId};
 use songbird::Songbird;
 use std::sync::Arc;
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 pub mod constants;
 pub mod time_parsers;
@@ -81,4 +81,14 @@ pub async fn delete_player_message(context: &Context, interaction: &ComponentInt
     if let Err(e) = interaction.message.delete(&context).await {
         event!(Level::WARN, error = %e, "cannot delete old player message");
     }
+}
+
+/// Cleans up the player and deletes the old player message.
+pub async fn player_not_exists<'a>(
+    context: &Context,
+    interaction: &ComponentInteraction,
+) -> Cow<'a, str> {
+    delete_player_message(context, interaction).await;
+
+    Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
 }

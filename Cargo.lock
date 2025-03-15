@@ -890,6 +890,7 @@ dependencies = [
  "moka",
  "parking_lot",
  "phf",
+ "rand 0.9.0",
  "regex",
  "reqwest 0.12.14",
  "serde",

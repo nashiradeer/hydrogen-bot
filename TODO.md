@@ -3,7 +3,7 @@
 ## 0.0.1-alpha.14
 
 - [x] Update dependencies. (if needed)
-- [ ] Create the shuffle component.
+- [x] Create the shuffle component.
 - [ ] Create commands for the Music Player's components.
 - [ ] Create the about command.
 - [ ] Create the donate command.
