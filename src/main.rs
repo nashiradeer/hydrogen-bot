@@ -1,5 +1,5 @@
 use handler::{handle_command, handle_component, register_commands};
-use lavalink::{cluster::Cluster, Rest};
+use lavalink::{Rest, cluster::Cluster};
 use music::PlayerManager;
 use parking_lot::Mutex;
 use serenity::{
@@ -16,9 +16,9 @@ use std::{
     sync::{Arc, OnceLock},
     time::Instant,
 };
-use tracing::{event, instrument, Level};
+use tracing::{Level, event, instrument};
 use tracing_subscriber::{
-    fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt, EnvFilter,
+    EnvFilter, fmt::layer, layer::SubscriberExt, registry, util::SubscriberInitExt,
 };
 use utils::constants::{
     HYDROGEN_UPDATE_VOICE_SERVER_THRESHOLD, HYDROGEN_UPDATE_VOICE_STATE_THRESHOLD,
@@ -31,6 +31,7 @@ mod i18n;
 #[allow(dead_code)]
 mod lavalink;
 mod music;
+mod shared;
 mod utils;
 
 /// The commands IDs that are registered.
