@@ -4,6 +4,8 @@
 
 ### Added
 
+- Create the shared behavior to share logic between components and commands.
+- Create the loop command.
 - Implement `PlayerManager::shuffle` method.
 - Implement the shuffle component.
 
@@ -11,6 +13,7 @@
 
 - Enable the `shuffle` component on the player message.
 - Pin the Debian Image on `bookworm-20250224-slim`.
+- Refactor some components to be shared behavior.
 - Update Alpine Image to 3.21.3.
 - Update dependencies to the latest compatible versions.
 - Update `http` to 1.3.1.

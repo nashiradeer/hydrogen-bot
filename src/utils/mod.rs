@@ -1,8 +1,9 @@
 //! Utilities that can be shared between commands and components.
 
 use crate::i18n::t;
+use crate::shared::SharedInteraction;
 use beef::lean::Cow;
-use serenity::all::{ChannelId, ComponentInteraction, Context, GuildId, UserId};
+use serenity::all::{ChannelId, Context, GuildId, UserId};
 use songbird::Songbird;
 use std::sync::Arc;
 use tracing::{Level, event};
@@ -77,18 +78,20 @@ pub fn get_voice_channel<'a>(
 }
 
 /// Deletes the old player message.
-pub async fn delete_player_message(context: &Context, interaction: &ComponentInteraction) {
-    if let Err(e) = interaction.message.delete(&context).await {
-        event!(Level::WARN, error = %e, "cannot delete old player message");
+pub async fn delete_player_message(context: &Context, interaction: &SharedInteraction<'_>) {
+    if let Some(message) = interaction.message() {
+        if let Err(e) = message.delete(&context).await {
+            event!(Level::WARN, error = %e, "cannot delete old player message");
+        }
     }
 }
 
 /// Cleans up the player and deletes the old player message.
 pub async fn player_not_exists<'a>(
     context: &Context,
-    interaction: &ComponentInteraction,
+    interaction: &SharedInteraction<'_>,
 ) -> Cow<'a, str> {
     delete_player_message(context, interaction).await;
 
-    Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
+    Cow::borrowed(t(interaction.locale(), "error.player_not_exists"))
 }

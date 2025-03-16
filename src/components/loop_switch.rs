@@ -2,10 +2,11 @@
 
 use beef::lean::Cow;
 use serenity::all::{ComponentInteraction, Context};
-use tracing::{event, Level};
+use tracing::{Level, event};
 
+use crate::shared::SharedInteraction;
 use crate::utils::delete_player_message;
-use crate::{i18n::t, music::LoopMode, utils, PLAYER_MANAGER};
+use crate::{PLAYER_MANAGER, i18n::t, music::LoopMode, utils};
 
 /// Executes the `loop` command.
 pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) -> Cow<'a, str> {
@@ -49,7 +50,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
             Cow::borrowed(t(&interaction.locale, "error.not_in_voice_channel"))
         }
     } else {
-        delete_player_message(context, interaction).await;
+        delete_player_message(context, &SharedInteraction::from(interaction)).await;
 
         Cow::borrowed(t(&interaction.locale, "error.player_not_exists"))
     }

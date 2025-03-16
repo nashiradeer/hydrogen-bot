@@ -4,7 +4,7 @@
 
 - [x] Update dependencies. (if needed)
 - [x] Create the shuffle component.
-- [ ] Create commands for the Music Player's components.
+- [x] Create commands for the Music Player's components.
 - [ ] Create the about command.
 - [ ] Create the donate command.
 - [ ] Create a command to set Music Player language.
