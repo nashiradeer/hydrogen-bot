@@ -4,6 +4,16 @@ Discord music bot powered by Lavalink and focusing on performance, features, usa
 
 [![Discord](https://img.shields.io/badge/Discord%20Bot-5865F2?style=for-the-badge&logo=discord&logoColor=%23fff)](https://discord.com/api/oauth2/authorize?client_id=1128087591179268116&permissions=275417975808&scope=bot+applications.commands)
 
+## Donating
+
+You can help Hydrogen's development by donating.
+
+[![GitHub Sponsor](https://img.shields.io/badge/GitHub%20Sponsor-181717?style=for-the-badge&logo=github&logoColor=%23fff)
+](https://github.com/sponsors/nashiradeer)
+[![Patreon](https://img.shields.io/badge/Patreon-%23000?style=for-the-badge&logo=patreon&logoColor=%23fff)
+](https://www.patreon.com/nashiradeer)
+[![Pix](https://img.shields.io/badge/Pix-%2377B6A8?style=for-the-badge&logo=pix&logoColor=%23fff)](https://pixie.gg/nashiradeer)
+
 ## Developing
 
 To develop Hydrogen, you need to have [Docker](https://docker.com)
@@ -45,6 +55,6 @@ You can configure Hydrogen using environment variables, here is a list of the av
   `localhost:2333@youshallnotpass;lavalink:443@securepassword/tls`)
 - DISABLE_MULTI_THREADING: Disables multi-threading. (optional, default: false)
 
-## Credits
+## License
 
-Copyright © 2024-2025 Nashira Deer. All rights reserved.
+Created by [Nashira Deer](https://www.nashiradeer.com) and licensed under [General Public License v3.0](https://github.com/nashiradeer/hydrogen-bot/blob/main/LICENSE.txt).
