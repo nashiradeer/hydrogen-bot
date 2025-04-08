@@ -77,7 +77,7 @@ default-features = false
 features = ["gateway", "serenity", "rustls"]
 
 [dependencies.tokio]
-version = "1.41.0"
+version = "1.44.2"
 features = ["macros", "rt-multi-thread", "parking_lot"]
 
 [dependencies.tracing]
