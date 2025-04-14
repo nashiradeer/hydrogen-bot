@@ -170,6 +170,11 @@ impl PlayerManager {
             .flatten()
     }
 
+    /// Get the count of players on this manager.
+    pub fn get_player_count(&self) -> usize {
+        self.players.len()
+    }
+
     /// Get the voice channel ID for the guild.
     ///
     /// This method will return `None` if the player does not exist too.
