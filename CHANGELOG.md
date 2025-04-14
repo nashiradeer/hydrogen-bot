@@ -4,8 +4,10 @@
 
 ### Added
 
+- Create about command.
 - Create the shared behavior to share logic between components and commands.
 - Create the loop command.
+- Implement `PlayerManager::get_player_count` method.
 - Implement `PlayerManager::shuffle` method.
 - Implement the shuffle component.
 
