@@ -4,6 +4,7 @@ use beef::lean::Cow;
 use serenity::all::{CommandInteraction, Context, CreateCommand};
 use tracing::{Level, event};
 
+mod about;
 mod join;
 mod loop_switch;
 mod pause;
@@ -25,6 +26,7 @@ pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Opt
         "stop" => stop::execute(context, command).await,
         "join" => join::execute(context, command).await,
         "time" => time::execute(context, command).await,
+        "about" => about::execute(context, command).await,
         _ => {
             event!(Level::ERROR, "unknown command");
             return None;
@@ -32,7 +34,7 @@ pub async fn execute<'a>(context: &Context, command: &CommandInteraction) -> Opt
     })
 }
 
-pub fn all_create_commands() -> [CreateCommand; 9] {
+pub fn all_create_commands() -> [CreateCommand; 10] {
     [
         skip::create_command(),
         pause::create_command(),
@@ -43,5 +45,6 @@ pub fn all_create_commands() -> [CreateCommand; 9] {
         stop::create_command(),
         join::create_command(),
         time::create_command(),
+        about::create_command(),
     ]
 }

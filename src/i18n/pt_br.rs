@@ -79,4 +79,7 @@ pub static TRANSLATIONS: Map<&'static str, &'static str> = phf_map! {
     "shuffle.name" => "embaralhar",
     "shuffle.description" => "Embaralha a fila do tocador de música.",
     "shuffle.result" => "A fila foi embaralhada.",
+    "about.name" => "sobre",
+    "about.description" => "Mostra informações sobre o bot.",
+    "about.result" => "**Hydrogen** um bot de música por [Nashira Deer](https://www.nashiradeer.com).\n\n**Versão** {0}\n**Quantidade de Servidores** {1}\n**Quantidade de Tocadores** {2}",
 };
