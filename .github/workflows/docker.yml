@@ -2,8 +2,8 @@ name: Docker Workflow
 
 on:
   push:
-    tags: ["v*"]
-    branches: ["main", "stable"]
+    tags: [ "v*" ]
+    branches: [ "main", "stable" ]
   workflow_dispatch:
 
 env:
@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        variant: [alpine, debian]
+        variant: [ alpine, debian ]
 
     permissions:
       contents: read
@@ -43,7 +43,7 @@ jobs:
         id: push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./hydrogen
           push: true
           file: ./Dockerfile.${{ matrix.variant }}
           tags: ${{ steps.meta.outputs.tags }}
