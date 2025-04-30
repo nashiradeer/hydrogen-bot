@@ -45,6 +45,6 @@ jobs:
         with:
           context: ./hydrogen
           push: true
-          file: ./Dockerfile.${{ matrix.variant }}
+          file: ./hydrogen/Dockerfile.${{ matrix.variant }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
