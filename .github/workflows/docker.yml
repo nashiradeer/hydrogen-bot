@@ -43,7 +43,7 @@ jobs:
         id: push
         uses: docker/build-push-action@v6
         with:
-          context: ./hydrogen
+          context: .
           push: true
           file: ./hydrogen/Dockerfile.${{ matrix.variant }}
           tags: ${{ steps.meta.outputs.tags }}
