@@ -12,8 +12,8 @@ publish = false
 [features]
 default = ["simd-json", "native-tls"]
 simd-json = ["serenity/simd_json", "hydrolink/simd-json-beef"]
-native-tls = ["serenity/native_tls_backend", "hydrolink/native-tls"]
-rustls-tls = ["serenity/rustls_backend", "hydrolink/rustls-tls"]
+native-tls = ["serenity/native_tls_backend", "hydrolink/native-tls", "songbird/native"]
+rustls-tls = ["serenity/rustls_backend", "hydrolink/rustls-tls", "songbird/rustls"]
 
 [dependencies]
 dashmap = "6.1.0"
@@ -56,7 +56,7 @@ features = [
 [dependencies.songbird]
 version = "0.5.0"
 default-features = false
-features = ["gateway", "serenity", "rustls"]
+features = ["gateway", "serenity"]
 
 [dependencies.tokio]
 version = "1.44.2"
