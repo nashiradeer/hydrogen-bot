@@ -1,5 +1,6 @@
 FROM rust:1.85.0-slim-bookworm AS builder
 RUN apt-get update -y && apt-get upgrade -y
+RUN apt-get install -y libssl-dev pkg-config
 WORKDIR /app
 COPY . .
 RUN cargo build --release --package hydrogen --no-default-features --features simd-json,native-tls
