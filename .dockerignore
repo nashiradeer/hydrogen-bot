@@ -1,0 +1,13 @@
+/.git
+/.github
+/.vscode
+/.idea
+/target
+/hydrogen/icons
+/hydrogen/dev
+**/.gitignore
+**/CHANGELOG.md
+**/README.md
+**/TODO.md
+**/LICENSE.txt
+rust-toolchain.toml

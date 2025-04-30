@@ -1,13 +1,10 @@
 FROM rust:1.85.0-slim-bookworm AS builder
 RUN apt-get update -y && apt-get upgrade -y
 WORKDIR /app
-COPY ./hydrogen/src/ src/
-COPY ./hydrogen/Cargo.toml Cargo.toml
-COPY Cargo.lock Cargo.lock
-RUN cargo build -r
+COPY . .
+RUN cargo build --release --package hydrogen --no-default-features --features simd-json,native-tls
 
-FROM debian:bookworm-20250224-slim
-RUN apt update -y && apt upgrade -y
+FROM gcr.io/distroless/cc-debian12:latest
 WORKDIR /app
 COPY --from=builder /app/target/release/hydrogen hydrogen
 CMD ["/app/hydrogen"]
