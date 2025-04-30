@@ -1,4 +1,4 @@
-# Hydrogen // Changelog
+# Hydrolink // Changelog
 
 ## [Unreleased]
 
