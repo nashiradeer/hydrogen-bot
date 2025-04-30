@@ -1,0 +1,110 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: false
+
+plugins:
+  youtube:
+    enabled: true
+    oauth:
+      enabled: true
+      refreshToken: # Paste your refresh token here
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients:
+      - MUSIC
+      - WEB
+      - TVHTML5EMBEDDED
+      - TV
+
+  lavasrc:
+    providers:
+      - 'ytsearch:"%ISRC%"'
+      - "ytsearch:%QUERY%"
+      - "dzisrc:%ISRC%"
+      - "dzsearch:%QUERY%"
+      - "scsearch:%QUERY%"
+    sources:
+      spotify: true
+      deezer: true
+    spotify:
+      clientId: # Paste your client ID here
+      clientSecret: # Paste your client secret here
+      countryCode: "US"
+      playlistLoadLimit: 10 # Each page has 100 items
+      albumLoadLimit: 20 # Each page has 50 items
+      resolveArtistsInSearch: true
+      localFiles: false
+    deezer:
+      masterDecryptionKey: # Paste your master decryption key here
+      formats: [ "MP3_128", "MP3_64" ]
+
+lavalink:
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.12.0"
+      repository: "https://maven.lavalink.dev/releases"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
+      repository: "https://maven.lavalink.dev/releases"
+
+  server:
+    password: # Paste your Lavalink password here
+    sources:
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      nico: true
+      http: true
+      local: false
+    filters:
+      volume: false
+      equalizer: false
+      karaoke: false
+      timescale: false
+      tremolo: false
+      vibrato: false
+      distortion: false
+      rotation: false
+      channelMix: false
+      lowPass: false
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    youtubePlaylistLoadLimit: 10 # Each page has 100 items
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+
+sentry:
+  dsn: ""
+  environment: ""
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
+
+  request:
+    enabled: true
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: true
+    maxPayloadLength: 10000
+
+  logback:
+    rollingpolicy:
+      max-file-size: 1GB
+      max-history: 30

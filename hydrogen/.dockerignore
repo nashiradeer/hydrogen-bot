@@ -1,0 +1,11 @@
+/.git
+/.github
+/.vscode
+/target
+/icons
+/.devcontainer
+/dev
+.gitignore
+CHANGELOG.md
+README.md
+TODO.md
