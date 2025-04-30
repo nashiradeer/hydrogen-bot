@@ -3,22 +3,21 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
 use futures::StreamExt;
-use parking_lot::RwLock;
 use tokio::{
     select,
-    sync::{mpsc, Mutex as AsyncMutex, Notify},
+    sync::{Mutex as AsyncMutex, Notify, mpsc},
 };
 
 use super::{
-    model::*,
-    utils::{connect, parse_message},
     Error, Rest, Result,
+    model::*,
+    utils::{RwLock, connect, parse_message},
 };
 
 /// Manages multiple Lavalink nodes using a round-robin strategy and a multi-producer, single-consumer channel to receive messages.

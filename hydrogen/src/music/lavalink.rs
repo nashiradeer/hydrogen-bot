@@ -3,16 +3,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use hydrolink::{Event, Message, MessageKind, cluster::Cluster};
 use serenity::all::GuildId;
 use tokio::time::sleep;
-use tracing::{event, instrument, span, Instrument, Level};
+use tracing::{Instrument, Level, event, instrument, span};
 
 use super::PlayerManager;
-use crate::lavalink::MessageKind;
-use crate::{
-    lavalink::{cluster::Cluster, Event, Message},
-    utils::constants::{HYDROGEN_LAVALINK_EVENT_THRESHOLD, LAVALINK_RECONNECTION_DELAY},
-};
+use crate::utils::constants::{HYDROGEN_LAVALINK_EVENT_THRESHOLD, LAVALINK_RECONNECTION_DELAY};
 
 /// Handle the Lavalink events.
 pub fn handle_lavalink(player_manager: PlayerManager) {
@@ -32,7 +29,7 @@ pub fn handle_lavalink(player_manager: PlayerManager) {
 async fn process_message(
     player_manager: PlayerManager,
     node_id: usize,
-    message: Option<Result<Message, crate::lavalink::Error>>,
+    message: Option<Result<Message, hydrolink::Error>>,
 ) {
     let spammy_message = message
         .as_ref()

@@ -4,6 +4,7 @@ mod lavalink;
 mod message;
 mod player;
 
+use hydrolink::{LoadResult, Rest, UpdatePlayer, UpdatePlayerTrack, VoiceState, cluster::Cluster};
 use message::update_message;
 pub use player::*;
 use tokio::time::sleep;
@@ -17,11 +18,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    lavalink::{LoadResult, Rest, UpdatePlayer, UpdatePlayerTrack, VoiceState, cluster::Cluster},
-    utils::constants::{
-        HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
-    },
+use crate::utils::constants::{
+    HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
 };
 use dashmap::DashMap;
 use lavalink::{handle_lavalink, reconnect_node};
@@ -830,7 +828,8 @@ impl PlayerManager {
 
             self.lavalink
                 .update_player(node_id, &guild_id.to_string(), &update_player, true)
-                .await?;
+                .await
+                .map_err(Error::from)?;
         }
 
         Ok(())
@@ -994,7 +993,7 @@ pub enum Error {
     /// There's no available Lavalink node.
     NoAvailableLavalink,
     /// Error from the Lavalink node.
-    Lavalink(crate::lavalink::Error),
+    Lavalink(hydrolink::Error),
     /// Invalid guild ID.
     InvalidGuildId,
     /// Error when joining a voice channel.
@@ -1021,8 +1020,8 @@ impl Display for Error {
     }
 }
 
-impl From<crate::lavalink::Error> for Error {
-    fn from(e: crate::lavalink::Error) -> Self {
+impl From<hydrolink::Error> for Error {
+    fn from(e: hydrolink::Error) -> Self {
         Self::Lavalink(e)
     }
 }

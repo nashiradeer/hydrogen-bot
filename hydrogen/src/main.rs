@@ -1,5 +1,6 @@
+use crate::utils::constants::HYDROGEN_USER_AGENT;
 use handler::{handle_command, handle_component, register_commands};
-use lavalink::{Rest, cluster::Cluster};
+use hydrolink::{Rest, cluster::Cluster};
 use music::PlayerManager;
 use parking_lot::Mutex;
 use serenity::{
@@ -28,8 +29,6 @@ mod commands;
 mod components;
 mod handler;
 mod i18n;
-#[allow(dead_code)]
-mod lavalink;
 mod music;
 mod shared;
 mod utils;
@@ -113,7 +112,7 @@ async fn hydrogen() {
 
 /// Initializes the Lavalink nodes.
 fn init_lavalink() -> Vec<Rest> {
-    let lavalink_builder = match lavalink::hydrogen::ConfigParser::new() {
+    let lavalink_builder = match hydrolink::hydrogen::ConfigParser::new(HYDROGEN_USER_AGENT) {
         Ok(v) => v,
         Err(e) => {
             event!(Level::ERROR, error = ?e, "cannot create the Lavalink builder");

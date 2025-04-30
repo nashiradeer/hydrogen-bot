@@ -10,14 +10,12 @@ pub(crate) mod utils;
 mod websocket;
 
 use http::header::InvalidHeaderValue;
-pub use model::*;
-pub use rest::*;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-/// User agent for the REST client.
-pub const LAVALINK_USER_AGENT: &str =
-    concat!("Hydrogen/", env!("CARGO_PKG_VERSION"), " Hydrolink/2.0.0");
+pub use model::*;
+pub use rest::*;
+pub use websocket::*;
 
 /// Client name for the WebSocket client.
 pub const LAVALINK_CLIENT_NAME: &str = "Hydrolink/2.0.0";

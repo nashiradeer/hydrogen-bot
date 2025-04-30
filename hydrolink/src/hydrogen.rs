@@ -5,18 +5,22 @@ use regex::Regex;
 use super::Rest;
 
 /// Hydrogen's Lavalink configuration parser.
-pub struct ConfigParser {
+pub struct ConfigParser<'a> {
     /// The regex engine to parse the configuration.
     single_string_regex: Regex,
+
+    /// User agent.
+    user_agent: &'a str,
 }
 
-impl ConfigParser {
+impl<'a> ConfigParser<'a> {
     /// Creates a new instance of the parser.
-    pub fn new() -> Result<Self, regex::Error> {
+    pub fn new(user_agent: &'a str) -> Result<Self, regex::Error> {
         Ok(Self {
             single_string_regex: Regex::new(
                 r"((?:\[.+]|[^;:\n]+):[0-9]{1,5})@([^/;\n]+)(?:/([^;\n]+))?;?",
             )?,
+            user_agent,
         })
     }
 
@@ -29,9 +33,15 @@ impl ConfigParser {
                 let password = cap.get(2)?;
 
                 if let Some(query) = cap.get(3) {
-                    Rest::new(host.as_str(), password.as_str(), query.as_str() == "tls").ok()
+                    Rest::new(
+                        host.as_str(),
+                        password.as_str(),
+                        self.user_agent,
+                        query.as_str() == "tls",
+                    )
+                    .ok()
                 } else {
-                    Rest::new(host.as_str(), password.as_str(), false).ok()
+                    Rest::new(host.as_str(), password.as_str(), self.user_agent, false).ok()
                 }
             })
             .collect()

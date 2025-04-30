@@ -2,10 +2,9 @@
 
 use std::fmt::{self, Display, Formatter};
 
+use hydrolink::Track as LavalinkTrack;
 use serenity::all::{ChannelId, GuildId, MessageId, ReactionType, UserId};
 use tokio::task::JoinHandle;
-
-use crate::lavalink::Track as LavalinkTrack;
 
 #[derive(Debug)]
 /// Player information.

@@ -2,12 +2,12 @@
 
 use std::time::Duration;
 
-use super::{model::*, ApiResponse, Error, Result, LAVALINK_USER_AGENT};
-use bytes::{Bytes, BytesMut};
+use super::{ApiResponse, Error, Result, model::*};
+use bytes::Bytes;
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use reqwest::Client;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use url::Url;
 
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub struct Rest {
 
 impl Rest {
     /// Create a new REST client.
-    pub fn new(host: &str, password: &str, tls: bool) -> Result<Self> {
+    pub fn new(host: &str, password: &str, user_agent: &str, tls: bool) -> Result<Self> {
         let headers = [
             (
                 HeaderName::from_static("authorization"),
@@ -40,7 +40,7 @@ impl Rest {
         ];
 
         let client = Client::builder()
-            .user_agent(LAVALINK_USER_AGENT)
+            .user_agent(user_agent)
             .default_headers(HeaderMap::from_iter(headers))
             .read_timeout(Duration::from_secs(60))
             .build()
@@ -112,7 +112,7 @@ impl Rest {
     #[cfg_attr(docsrs, doc(cfg(feature = "simd-json")))]
     /// Deserialize the response in JSON using the selected JSON library.
     pub fn deserialize_response<T: DeserializeOwned>(&self, value: Bytes) -> Result<T> {
-        let mut value_mutable = value.try_into_mut().unwrap_or_else(BytesMut::from);
+        let mut value_mutable = value.try_into_mut().unwrap_or_else(bytes::BytesMut::from);
         simd_json::from_slice(value_mutable.as_mut()).map_err(Error::from)
     }
 

@@ -1,13 +1,18 @@
 use std::{borrow::Borrow, ops::Deref};
 
 use futures::StreamExt;
-use parking_lot::RwLock;
 use tokio::sync::Mutex as AsyncMutex;
 
+#[cfg(feature = "parking-lot")]
+use parking_lot::RwLock;
+
+#[cfg(not(feature = "parking-lot"))]
+use std::sync::RwLock;
+
 use super::{
+    Error, LavalinkConnection, Rest, Result,
     model::*,
     utils::{connect, parse_message, resume_session},
-    Error, LavalinkConnection, Rest, Result,
 };
 
 #[derive(Debug)]
@@ -76,11 +81,20 @@ impl Lavalink {
         &self.user_id
     }
 
+    #[cfg(feature = "parking-lot")]
     /// Get the session ID.
     ///
     /// This method clones the session ID to avoid locking the internal mutex.
     pub fn session_id(&self) -> Option<String> {
         self.session_id.read().clone()
+    }
+
+    #[cfg(not(feature = "parking-lot"))]
+    /// Get the session ID.
+    ///
+    /// This method clones the session ID to avoid locking the internal mutex.
+    pub fn session_id(&self) -> Option<String> {
+        self.session_id.read().unwrap().clone()
     }
 
     /// Get the REST client.
@@ -136,6 +150,7 @@ impl Lavalink {
             .await
     }
 
+    #[cfg(feature = "parking-lot")]
     /// Receive the next message from the Lavalink server.
     ///
     /// WARNING: This method locks the internal connection mutex.
@@ -144,6 +159,20 @@ impl Lavalink {
 
         if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
             *self.session_id.write() = Some(msg.session_id.clone());
+        }
+
+        Some(data)
+    }
+
+    #[cfg(not(feature = "parking-lot"))]
+    /// Receive the next message from the Lavalink server.
+    ///
+    /// WARNING: This method locks the internal connection mutex.
+    pub async fn next(&self) -> Option<Result<Message>> {
+        let data = parse_message(self.connection.lock().await.next().await?);
+
+        if let Some(msg) = data.as_ref().ok().and_then(|v| v.as_ready()) {
+            *self.session_id.write().unwrap() = Some(msg.session_id.clone());
         }
 
         Some(data)

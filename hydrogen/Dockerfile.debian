@@ -3,7 +3,7 @@ RUN apt-get update -y && apt-get upgrade -y
 WORKDIR /app
 COPY src/ src/
 COPY Cargo.toml Cargo.toml
-COPY Cargo.lock Cargo.lock
+COPY ../Cargo.lock Cargo.lock
 RUN cargo build -r
 
 FROM debian:bookworm-20250224-slim

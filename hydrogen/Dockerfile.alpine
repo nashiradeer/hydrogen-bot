@@ -4,7 +4,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /app
 COPY src/ src/
 COPY Cargo.toml Cargo.toml
-COPY Cargo.lock Cargo.lock
+COPY ../Cargo.lock Cargo.lock
 RUN cargo build -r
 
 FROM alpine:3.21.3

@@ -17,13 +17,8 @@ pub static HYDROGEN_SEARCH_PREFIXES: [&str; 3] = ["ytsearch:", "dzsearch:", "scs
 /// Connection timeout for the Lavalink node in seconds.
 pub const LAVALINK_RECONNECTION_DELAY: u64 = 5;
 
-#[allow(dead_code)]
-/// Hydrogen's version.
-pub static HYDROGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[allow(dead_code)]
-/// Hydrogen's project name.
-pub static HYDROGEN_NAME: &str = "Hydrogen";
+/// The user agent used for the Lavalink node.
+pub static HYDROGEN_USER_AGENT: &str = concat!("Hydrogen/", env!("CARGO_PKG_VERSION"),);
 
 /// The time in milliseconds to consider a ready event as slow.
 pub const HYDROGEN_READY_THRESHOLD: Duration = Duration::from_millis(600);
