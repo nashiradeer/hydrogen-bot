@@ -36,6 +36,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some("single") => LoopMode::Single,
         Some("all") => LoopMode::All,
         Some("auto_pause") => LoopMode::AutoPause,
+        Some("autoplay") => LoopMode::Autoplay,
         _ => LoopMode::None,
     };
 
@@ -57,6 +58,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
                 LoopMode::AutoPause => "loop.pause",
                 LoopMode::Single => "loop.music",
                 LoopMode::All => "loop.queue",
+                LoopMode::Autoplay => "loop.autoplay",
             };
 
             Cow::borrowed(t(&interaction.locale, loop_type_translation_key))
@@ -86,17 +88,18 @@ pub fn create_command() -> CreateCommand {
                 "The loop mode to set.",
             )
             .required(true)
-            .add_string_choice_localized("Default", "default", t_all("join.mode_default"))
-            .add_string_choice_localized("Single", "single", t_all("join.mode_single"))
-            .add_string_choice_localized("All", "all", t_all("join.mode_all"))
+            .add_string_choice_localized("Default", "default", t_all("loop.mode_default"))
+            .add_string_choice_localized("Single", "single", t_all("loop.mode_single"))
+            .add_string_choice_localized("All", "all", t_all("loop.mode_all"))
+            .add_string_choice_localized("Auto Pause", "auto_pause", t_all("loop.mode_auto_pause"))
             .add_string_choice_localized(
-                "Auto Pause",
-                "auto_pause",
-                t_all("join.mode_auto_pause"),
+                "Autoplay",
+                "autoplay",
+                t_all("loop.mode_autoplay"),
             );
 
-            option = serenity_command_option_name("join.mode_name", option);
-            option = serenity_command_option_description("join.mode_description", option);
+            option = serenity_command_option_name("loop.mode_name", option);
+            option = serenity_command_option_description("loop.mode_description", option);
 
             option
         })

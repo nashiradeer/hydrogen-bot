@@ -101,6 +101,11 @@ impl Cluster {
         &self.nodes
     }
 
+    /// Get the user ID.
+    pub fn user_id(&self) -> &str {
+        &self.user_id
+    }
+
     /// Get the list of connected nodes.
     pub fn connected_nodes(&self) -> Vec<usize> {
         self.session_id.read().keys().copied().collect()

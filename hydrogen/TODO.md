@@ -8,7 +8,7 @@
 - [ ] Create the about command.
 - [ ] Create the donate command.
 - [ ] Create a command to set Music Player language.
-- [ ] Implement auto-play loop mode.
+- [x] Implement auto-play loop mode.
 
 ## 0.0.1-alpha.15
 
