@@ -3,13 +3,14 @@
 use beef::lean::Cow;
 use serenity::all::{CommandOptionType, CreateCommandOption};
 use serenity::{all::CommandInteraction, builder::CreateCommand, client::Context};
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 use crate::i18n::{serenity_command_option_description, serenity_command_option_name, t, t_all};
 use crate::music::PlayerTemplate;
 use crate::{
+    LOADED_COMMANDS, PLAYER_MANAGER,
     i18n::{serenity_command_description, serenity_command_name, t_vars},
-    utils, LOADED_COMMANDS, PLAYER_MANAGER,
+    utils,
 };
 
 /// Executes the `/join` command.
@@ -40,6 +41,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         Some("queue") => PlayerTemplate::Queue,
         Some("manual") => PlayerTemplate::Manual,
         Some("rpg") => PlayerTemplate::Rpg,
+        Some("autoplay") => PlayerTemplate::Autoplay,
         _ => PlayerTemplate::Default,
     };
 
@@ -83,6 +85,7 @@ pub async fn execute<'a>(context: &Context, interaction: &CommandInteraction) ->
         PlayerTemplate::Queue => t(&interaction.locale, "join.template_queue"),
         PlayerTemplate::Manual => t(&interaction.locale, "join.template_manual"),
         PlayerTemplate::Rpg => t(&interaction.locale, "join.template_rpg"),
+        PlayerTemplate::Autoplay => t(&interaction.locale, "join.template_autoplay"),
     };
 
     let play_command = match LOADED_COMMANDS.get().and_then(|v| v.get("play")) {
@@ -117,7 +120,12 @@ pub fn create_command() -> CreateCommand {
             .add_string_choice_localized("Music", "music", t_all("join.template_music"))
             .add_string_choice_localized("Queue", "queue", t_all("join.template_queue"))
             .add_string_choice_localized("Manual", "manual", t_all("join.template_manual"))
-            .add_string_choice_localized("RPG", "rpg", t_all("join.template_rpg"));
+            .add_string_choice_localized("RPG", "rpg", t_all("join.template_rpg"))
+            .add_string_choice_localized(
+                "Autoplay",
+                "autoplay",
+                t_all("join.template_autoplay"),
+            );
 
             option = serenity_command_option_name("join.template_name", option);
             option = serenity_command_option_description("join.template_description", option);
