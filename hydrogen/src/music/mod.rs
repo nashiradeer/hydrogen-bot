@@ -24,7 +24,6 @@ use serenity::all::{
     VoiceState as SerenityVoiceState,
 };
 use songbird::{Songbird, error::JoinError};
-use std::str::FromStr;
 use std::{
     error::Error as StdError,
     fmt::{self, Display, Formatter},
@@ -914,10 +913,8 @@ impl PlayerManager {
 
     /// Uses the player's loop mode to determine the next track to play.
     pub async fn next_track(&self, guild_id: GuildId) -> Result<()> {
-        if self.should_autoplay(guild_id) {
-            if self.autoplay(guild_id).await? {
-                return Ok(());
-            }
+        if self.should_autoplay(guild_id) && self.autoplay(guild_id).await? {
+            return Ok(());
         }
 
         let Some(mut player) = self.players.get_mut(&guild_id) else {
