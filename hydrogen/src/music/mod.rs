@@ -4,19 +4,14 @@ mod lavalink;
 mod message;
 mod player;
 
-use hydrolink::{LoadResult, Rest, UpdatePlayer, UpdatePlayerTrack, VoiceState, cluster::Cluster};
+use hydrolink::{
+    LoadResult, Rest, Track as LavalinkTrack, UpdatePlayer, UpdatePlayerTrack, VoiceState,
+    cluster::Cluster,
+};
 use message::update_message;
 pub use player::*;
 use tokio::time::sleep;
 use tracing::{Level, event};
-
-use std::{
-    error::Error as StdError,
-    fmt::{self, Display, Formatter},
-    result::Result as StdResult,
-    sync::Arc,
-    time::Duration,
-};
 
 use crate::utils::constants::{
     HYDROGEN_EMPTY_CHAT_TIMEOUT, HYDROGEN_QUEUE_LIMIT, HYDROGEN_SEARCH_PREFIXES,
@@ -29,6 +24,14 @@ use serenity::all::{
     VoiceState as SerenityVoiceState,
 };
 use songbird::{Songbird, error::JoinError};
+use std::str::FromStr;
+use std::{
+    error::Error as StdError,
+    fmt::{self, Display, Formatter},
+    result::Result as StdResult,
+    sync::Arc,
+    time::Duration,
+};
 
 #[derive(Debug, Clone)]
 /// The player manager.
@@ -49,6 +52,8 @@ pub struct PlayerManager {
     ///
     /// This [Arc] comes from outside the player manager.
     http: Arc<Http>,
+    /// The bot user ID.
+    user_id: UserId,
 }
 
 impl PlayerManager {
@@ -58,6 +63,7 @@ impl PlayerManager {
         lavalink: Arc<Cluster>,
         cache: Arc<Cache>,
         http: Arc<Http>,
+        user_id: UserId,
     ) -> Self {
         let players = Arc::new(DashMap::<GuildId, Player>::new());
 
@@ -76,6 +82,7 @@ impl PlayerManager {
             lavalink,
             cache,
             http,
+            user_id,
         };
 
         handle_lavalink(me.clone());
@@ -893,20 +900,31 @@ impl PlayerManager {
         });
     }
 
+    fn should_autoplay(&self, guild_id: GuildId) -> bool {
+        let Some(player) = self.players.get(&guild_id) else {
+            return false;
+        };
+
+        if player.current_track + 1 >= player.queue.len() {
+            matches!(player.loop_mode, LoopMode::Autoplay)
+        } else {
+            false
+        }
+    }
+
     /// Uses the player's loop mode to determine the next track to play.
     pub async fn next_track(&self, guild_id: GuildId) -> Result<()> {
+        if self.should_autoplay(guild_id) {
+            if self.autoplay(guild_id).await? {
+                return Ok(());
+            }
+        }
+
         let Some(mut player) = self.players.get_mut(&guild_id) else {
             return Ok(());
         };
 
         let (new_index, should_pause, need_sync) = match player.loop_mode {
-            LoopMode::None => {
-                if player.current_track + 1 >= player.queue.len() {
-                    (player.queue.len() - 1, false, false)
-                } else {
-                    (player.current_track + 1, false, true)
-                }
-            }
             LoopMode::Single => (player.current_track, false, true),
             LoopMode::All => (player.current_track + 1 % player.queue.len(), false, true),
             LoopMode::AutoPause => {
@@ -914,6 +932,13 @@ impl PlayerManager {
                     (player.queue.len() - 1, true, false)
                 } else {
                     (player.current_track + 1, true, false)
+                }
+            }
+            _ => {
+                if player.current_track + 1 >= player.queue.len() {
+                    (player.queue.len() - 1, false, false)
+                } else {
+                    (player.current_track + 1, false, true)
                 }
             }
         };
@@ -930,6 +955,40 @@ impl PlayerManager {
         }
 
         Ok(())
+    }
+
+    /// Autoplay the next track using YouTube Mix, returning `true` if it was successful.
+    async fn autoplay(&self, guild_id: GuildId) -> Result<bool> {
+        event!(Level::DEBUG, guild_id = ?guild_id, "autoplay has been triggered");
+
+        let Some(current_track) = self.players.view(&guild_id, |_, p| p.current_track) else {
+            return Ok(false);
+        };
+
+        let Some(track) = self
+            .get_track_from_youtube_mix(guild_id, current_track)
+            .await?
+        else {
+            return Ok(false);
+        };
+
+        let fetch_result = FetchResult {
+            selected: Some(0),
+            tracks: vec![track],
+        };
+
+        let add_queue_result =
+            self.add_queue(guild_id, fetch_result, self.user_id, AddQueueOperation::End)?;
+
+        self.forced_update_sync(
+            guild_id,
+            add_queue_result
+                .selected
+                .unwrap_or(add_queue_result.first_track_index),
+        )
+        .await?;
+
+        Ok(true)
     }
 
     /// Update the player message.
@@ -971,6 +1030,124 @@ impl PlayerManager {
         player.current_track = 0;
 
         Ok(())
+    }
+
+    /// Convert the load result to the identifier of the first track.
+    fn get_identifier(&self, load_result: LoadResult) -> Option<String> {
+        match load_result {
+            LoadResult::Track(track) => Some(track.info.identifier.clone()),
+            LoadResult::Playlist(playlist) => {
+                playlist.tracks.first().map(|t| t.info.identifier.clone())
+            }
+            LoadResult::Search(tracks) => tracks.first().map(|t| t.info.identifier.clone()),
+            _ => None,
+        }
+    }
+
+    /// Get the YouTube ID from a query.
+    async fn get_youtube_id_from_query(&self, query: &str) -> Result<Option<String>> {
+        let node_id = self
+            .lavalink
+            .search_connected_node()
+            .ok_or(Error::NoAvailableLavalink)?;
+
+        let node = &self.lavalink.nodes()[node_id];
+
+        let result = node
+            .load_track(&format!("ytsearch:{}", query))
+            .await
+            .map_err(Error::from)?;
+
+        Ok(self.get_identifier(result))
+    }
+
+    /// Get the YouTube ID from an ISRC code.
+    async fn get_youtube_id_from_isrc(&self, isrc: &str) -> Result<Option<String>> {
+        let node_id = self
+            .lavalink
+            .search_connected_node()
+            .ok_or(Error::NoAvailableLavalink)?;
+
+        let node = &self.lavalink.nodes()[node_id];
+
+        let result = node
+            .load_track(&format!("ytsearch:\"{}\"", isrc))
+            .await
+            .map_err(Error::from)?;
+
+        Ok(self.get_identifier(result))
+    }
+
+    /// Convert a track from queue to YouTube ID.
+    pub async fn get_youtube_id(&self, guild_id: GuildId, index: usize) -> Result<Option<String>> {
+        let youtube_id = self
+            .players
+            .view(&guild_id, |_, p| {
+                p.queue.get(index).map(|t| t.youtube_id.clone())
+            })
+            .ok_or(Error::PlayerNotFound)?
+            .flatten();
+
+        if youtube_id.is_none() {
+            if let Some(isrc) = self
+                .players
+                .view(&guild_id, |_, p| p.queue.get(index).map(|t| t.isrc.clone()))
+                .ok_or(Error::PlayerNotFound)?
+                .flatten()
+            {
+                return self.get_youtube_id_from_isrc(&isrc).await;
+            }
+
+            if let Some(track) = self
+                .players
+                .view(&guild_id, |_, p| {
+                    p.queue.get(index).map(|t| t.track.clone())
+                })
+                .ok_or(Error::PlayerNotFound)?
+            {
+                return self.get_youtube_id_from_query(&track).await;
+            }
+        }
+
+        Ok(youtube_id)
+    }
+
+    /// Get the YouTube ID from a YouTube mix.
+    async fn get_track_from_youtube_mix(
+        &self,
+        guild_id: GuildId,
+        index: usize,
+    ) -> Result<Option<LavalinkTrack>> {
+        let Some(youtube_id) = self.get_youtube_id(guild_id, index).await? else {
+            return Ok(None);
+        };
+
+        event!(Level::DEBUG, guild_id = ?guild_id, youtube_id = youtube_id, "getting track from youtube mix");
+
+        let node_id = self
+            .lavalink
+            .search_connected_node()
+            .ok_or(Error::NoAvailableLavalink)?;
+
+        let node = &self.lavalink.nodes()[node_id];
+
+        let result = node
+            .load_track(&format!(
+                "https://www.youtube.com/watch?v={0}&list=RD{0}",
+                youtube_id
+            ))
+            .await
+            .map_err(Error::from)?;
+
+        let track = match result {
+            LoadResult::Playlist(playlist) => playlist.tracks.into_iter().nth(1),
+            LoadResult::Search(tracks) => tracks.into_iter().nth(1),
+            _ => None,
+        };
+
+        event!(Level::DEBUG, guild_id = ?guild_id, track = ?track, "got track from youtube mix");
+
+        Ok(track)
     }
 }
 

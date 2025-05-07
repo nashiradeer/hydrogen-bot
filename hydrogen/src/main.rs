@@ -168,6 +168,7 @@ impl EventHandler for HydrogenHandler {
                     Arc::new(Cluster::new(lavalink_nodes, &ready.user.id.to_string()).await),
                     ctx.cache.clone(),
                     ctx.http.clone(),
+                    ready.user.id,
                 )
                 .await,
             )
