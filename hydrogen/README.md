@@ -22,6 +22,9 @@ the [dev/README.md](https://github.com/nashiradeer/hydrogen-bot/blob/main/hydrog
 
 ## Using
 
+**Warning:** YouTube Source is not optional, it is required because the autoplay feature uses it to get the next song
+from a YouTube mix.
+
 Hydrogen is available on
 our [GitHub Container Registry](https://github.com/nashiradeer/hydrogen-bot/pkgs/container/hydrogen-bot), you can use it
 by running

@@ -43,6 +43,7 @@ pub async fn execute<'a>(context: &Context, interaction: &ComponentInteraction) 
                 LoopMode::AutoPause => "loop.pause",
                 LoopMode::Single => "loop.music",
                 LoopMode::All => "loop.queue",
+                LoopMode::Autoplay => "loop.autoplay",
             };
 
             Cow::borrowed(t(&interaction.locale, loop_type_translation_key))

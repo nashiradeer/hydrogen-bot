@@ -121,6 +121,8 @@ pub enum LoopMode {
     All,
     /// Like [None], but automatically pauses after the track ends.
     AutoPause,
+    /// Autoplay the next track using YouTube Mix.
+    Autoplay,
 }
 
 impl LoopMode {
@@ -129,7 +131,8 @@ impl LoopMode {
         match self {
             LoopMode::None => LoopMode::Single,
             LoopMode::Single => LoopMode::All,
-            LoopMode::All => LoopMode::AutoPause,
+            LoopMode::All => LoopMode::Autoplay,
+            LoopMode::Autoplay => LoopMode::AutoPause,
             LoopMode::AutoPause => LoopMode::None,
         }
     }
@@ -142,6 +145,7 @@ impl Display for LoopMode {
             LoopMode::Single => write!(f, "🔂"),
             LoopMode::All => write!(f, "🔁"),
             LoopMode::AutoPause => write!(f, "↩️"),
+            LoopMode::Autoplay => write!(f, "🔄️"),
         }
     }
 }
@@ -155,7 +159,7 @@ impl From<LoopMode> for ReactionType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Track information.
 pub struct Track {
-    /// The track's identifier.
+    /// The track's encoded string.
     pub track: String,
     /// The track's author.
     pub author: String,
@@ -169,11 +173,21 @@ pub struct Track {
     pub url: Option<String>,
     /// The track's thumbnail.
     pub thumbnail: Option<String>,
+    /// The track's identifier from the YouTube source.
+    pub youtube_id: Option<String>,
+    /// The track's ISRC (International Standard Recording Code).
+    pub isrc: Option<String>,
 }
 
 impl Track {
     /// Create a new track.
     pub fn from_track(track: LavalinkTrack, requester: UserId) -> Self {
+        let youtube_id = if track.info.source_name.as_deref() == Some("youtube") {
+            Some(track.info.identifier.clone())
+        } else {
+            None
+        };
+
         Self {
             track: track.encoded,
             title: track.info.title,
@@ -182,20 +196,8 @@ impl Track {
             duration: track.info.length,
             url: track.info.uri,
             thumbnail: track.info.artwork_url,
-        }
-    }
-}
-
-impl From<LavalinkTrack> for Track {
-    fn from(track: LavalinkTrack) -> Self {
-        Self {
-            track: track.encoded,
-            title: track.info.title,
-            author: track.info.author,
-            requester: Default::default(),
-            duration: track.info.length,
-            url: track.info.uri,
-            thumbnail: track.info.artwork_url,
+            isrc: track.info.isrc,
+            youtube_id,
         }
     }
 }
@@ -247,6 +249,8 @@ pub enum PlayerTemplate {
     Manual,
     /// Player for RPG music with single loop and paused by default.
     Rpg,
+    /// Player with autoplay enabled.
+    Autoplay,
 }
 
 impl PlayerTemplate {
@@ -261,6 +265,7 @@ impl PlayerTemplate {
             Self::Music | Self::Rpg => LoopMode::Single,
             Self::Queue => LoopMode::All,
             Self::Manual => LoopMode::AutoPause,
+            Self::Autoplay => LoopMode::Autoplay,
             _ => LoopMode::None,
         }
     }
