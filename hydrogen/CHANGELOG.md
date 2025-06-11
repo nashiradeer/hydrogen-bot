@@ -7,6 +7,7 @@
 - Create the shared behavior to share logic between components and commands.
 - Create the loop command.
 - Implement autoplay loop mode using YouTube Mix.
+- Implement duplicate detection.
 - Implement helper functions to get the YouTube video ID from a Track.
 - Implement `PlayerManager::shuffle` method.
 - Implement the shuffle component.
