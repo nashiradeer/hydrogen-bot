@@ -925,7 +925,7 @@ impl PlayerManager {
 
         let (new_index, should_pause, need_sync) = match player.loop_mode {
             LoopMode::Single => (player.current_track, false, true),
-            LoopMode::All => (player.current_track + 1 % player.queue.len(), false, true),
+            LoopMode::All => ((player.current_track + 1) % player.queue.len(), false, true),
             LoopMode::AutoPause => {
                 if player.current_track + 1 >= player.queue.len() {
                     (player.queue.len() - 1, true, false)
